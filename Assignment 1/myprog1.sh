@@ -32,8 +32,8 @@ do
 done
 
 # then we print the histograms in a sorted order, that is from 0 - 9
-for (( i = 0 ; i < ${#counts[@]} ; i++ ))
+for (( i = 0 ; i < ${#frequency[@]} ; i++ ))
 do
-    multiplexer=$(printf "%${counts[$i]}s")
+    multiplexer=$(printf "%${frequency[$i]}s")
     echo "$i ${multiplexer// /*}"
 done
