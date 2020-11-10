@@ -1,5 +1,11 @@
 #!/bin/bash
 
+if [ -z $1 ]
+then
+    echo "Error - No filename is given"
+    exit 1
+fi
+
 counts=(0 0 0 0 0 0 0 0 0 0)  # TODO: try to solve for an empty array
 while read line
 do
