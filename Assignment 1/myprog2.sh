@@ -26,6 +26,7 @@ getCharIndex () {
     done
 }
 
+<<<<<<< HEAD
 # this loop is responsible for going over each character in the given argument
 # and handle the necessary ciphering processes
 for (( c = 0 ; c < ${#string} ; c++ ))
@@ -33,6 +34,12 @@ do
     char=${string:$c:1}
 
     # checking if the length of given number is 1 or equal to the length of string  
+=======
+for (( c = 0 ; c < ${#string} ; c++ ))
+do
+    char=${string:$c:1}
+    
+>>>>>>> e0d743455c13cd3e18d71702503e0e2311600398
     if [ ${#number} = 1 ]
     then
         digit=$number
@@ -40,11 +47,17 @@ do
         digit=${number:$c:1}
     fi
     
+<<<<<<< HEAD
     # get the index of the character from the array
     getCharIndex $char
     charIndex=$?
     
     # calculate the step and check if it overflows from 26 (number of alphabets)
+=======
+    getCharIndex $char
+    charIndex=$?
+    
+>>>>>>> e0d743455c13cd3e18d71702503e0e2311600398
     newIdx=`expr $charIndex + $digit`
     newIdx=`expr $newIdx % ${#alphabet[@]}`
     cipheredWord+=${alphabet[$newIdx]}
