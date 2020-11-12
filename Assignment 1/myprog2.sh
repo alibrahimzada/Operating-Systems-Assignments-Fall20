@@ -18,12 +18,23 @@ getCharIndex () {
     done
 }
 
-for (( i = 0 ; i < ${#string} ; i++ ))
+for (( c = 0 ; c < ${#string} ; c++ ))
 do
-    char=${string:$i:1}
-    # echo $char
-    # when there are only these two above lines, the loop runs fine.
+    char=${string:$c:1}
+    
+    if [ ${#number} = 1 ]
+    then
+        digit=$number
+    else
+        digit=${number:$c:1}
+    fi
+    
     getCharIndex $char
     charIndex=$?
-    echo $charIndex
+    
+    newIdx=`expr $charIndex + $digit`
+    newIdx=`expr $newIdx % ${#alphabet[@]}`
+    cipheredWord+=${alphabet[$newIdx]}
 done
+
+echo $cipheredWord
