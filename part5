@@ -1,0 +1,23 @@
+#!/bin/bash
+read -p "Please enter a wildcard argument: " wildcardArgument
+read -p "Please enter a -R option: " rOption
+if test -z "$wildcardArgument"
+then
+	echo "A wildcard argument should be entered!"
+
+
+elif test -z "$rOption"
+then
+	for FILE in $wildcardArgument
+	do
+		echo "Copying $FILE"
+		mkdir -p copied && cp -r $FILE copied
+	done
+
+elif [ ${rOption} != '-R' ]
+then
+	echo "A -R option should be entered!"
+
+else
+	ls $rOption
+fi
