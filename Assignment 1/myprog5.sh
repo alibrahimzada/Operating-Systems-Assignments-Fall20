@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 if [ $# == 1 ]
 then
 	if [ -z "$1" ]
@@ -15,7 +14,8 @@ else
 	then
 		echo "-R option is not entered correctly!"
 		exit 2
-	else  # this part needs to be fixed
-		mkdir -p copied && cp -R $1 copied
+	else
+		# a bug here ({}/$2 does not expand the wildcard)
+		find . -type d -not -path ".*copied" -exec mkdir -p {}/copied \; -exec cp {}/$2 {}/copied \;
 	fi
 fi
