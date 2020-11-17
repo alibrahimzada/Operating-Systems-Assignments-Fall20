@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # first we start by checking if the argument is NULL. If so, we exit with an error.
-if [ -z $1 ]   
+if [ -z $1 ]
 then
     echo "Error - No filename is given"
     exit 1
