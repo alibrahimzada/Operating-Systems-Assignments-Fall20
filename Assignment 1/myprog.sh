@@ -26,9 +26,15 @@ while :
         4) read -p "Please enter the filename: " filename4 ;
            ./myprog4.sh $filename4 ; read -p "Press Enter to go to Main Menu..." ;;
 
-        5) read -p "Please enter -R option, if any: " rOption ; 
+        5) read -p "Please enter -R option, if any: " rOption ;
            read -p "Please enter a wildcard: " wildCard ;
-           ./myprog5.sh $rOption $wildCard ; read -p "Press Enter to go to Main Menu..." ;;
+           if [ -z $rOption ]
+           then
+               ./myprog5.sh "$wildCard" ; read -p "Press Enter to go to Main Menu..."
+           else
+               ./myprog5.sh $rOption "$wildCard" ; read -p "Press Enter to go to Main Menu..."
+           fi
+           ;;
 
         6) exit 0 ;;
 
