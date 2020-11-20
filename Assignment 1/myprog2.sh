@@ -1,5 +1,16 @@
 #!/bin/bash
 
+string=$1
+number=$2
+
+# first we start by checking if the given arguments are invalid
+# if so, we exit with an error
+if [ ${#string} -ne ${#number} ] && [ ${#number} -ne 1 ]
+then
+    echo "These inputs are not valid"
+    exit 1
+fi
+
 # we first store alphabet in an array and later use their indices for 
 # creating the cipher word our script only works with lowercase alphabet
 # since handling uppercase is not mentioned in the manual
@@ -8,10 +19,7 @@ alphabet=('a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i'
           's' 't' 'u' 'v' 'w' 'x' 'y' 'z')
 
 # an empty cipher string at the beginning which gets appended later
-# moreover we also store the given arguments in variables
 cipheredWord=""
-string=$1
-number=$2
 
 # a function which finds the index of a specific character
 getCharIndex () {
