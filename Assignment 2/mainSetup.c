@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <string.h>
  
 #define MAX_LINE 80 /* 80 chars per line, per command, should be enough. */
  
@@ -79,6 +80,14 @@ void setup(char inputBuffer[], char *args[], int *background) {
 		printf("args %d = %s\n",i,args[i]);
 } /* end of setup routine */
 
+int isFileExists(const char *path) {
+    // Check for file existence
+    if (access(path, F_OK) == -1)
+        return 0;
+
+    return 1;
+}
+
 int main(void) {
     char inputBuffer[MAX_LINE]; /*buffer to hold command entered */
     int background; /* equals 1 if a command is followed by '&' */
@@ -97,26 +106,38 @@ int main(void) {
 
         pid_t childpid;
 
-        if ( (childpid = fork()) == -1 ) {
-            perror("failed to fork!");
+        if ( (childpid = fork()) == -1 ) {   // this condition is to check if fork was successfull
+            fprintf(stderr, "failed to fork!");
             continue;
         }
         
-        if ( childpid == 0 ) {
-            const char* s = getenv("PATH");
-            if (s == NULL) {
-                perror("getenv returned NULL");
+        if ( childpid == 0 ) {    // this condition is true when the processor schedules the child process
+            char* path = getenv("PATH");   // this returns all of the dirs in PATH env variable
+            if (path == NULL) {   // this condition is to check if PATH is empty
+                fprintf(stderr, "getenv returned NULL");
                 continue;
             }
-            printf("%s", s);
 
-            execv("/bin/ls", args);   // replace /bin/command with the program from $PATH
-            perror("child failed when running execv!");
-            continue;
+            char *dir = strtok(path, ":");
+            while(dir != NULL) {
+                char * absPath = (char *) malloc(1 + strlen(dir) + strlen(args[0]) );
+                strcpy(absPath, dir);
+                char slash = '/';
+                strncat(absPath, &slash, 1);
+                strcat(absPath, args[0]);
+
+                if (isFileExists(absPath)) {   // this condition checks if the given program exists in directory
+                    execv(absPath, args);   // if so, execute execv() from child process
+                    fprintf(stderr, "An error must have happened when running execv()!");
+                    break;
+                }
+
+		        dir = strtok(NULL, ":");
+	        }
         }
 
         if ( !background && wait(NULL) != childpid ) {   // needs some editing
-            perror("A signal must have interrupted the wait!");
+            fprintf(stderr, "A signal must have interrupted the wait!");
         }
     }
 }
