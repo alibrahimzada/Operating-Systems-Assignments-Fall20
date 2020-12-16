@@ -118,18 +118,18 @@ int main(void) {
                 continue;
             }
 
-            char *dir = strtok(path, ":");
-            while(dir != NULL) {
-                char * absPath = (char *) malloc(1 + strlen(dir) + strlen(args[0]) );
-                strcpy(absPath, dir);
+            char *dir = strtok(path, ":");   // tokenize with a delimitir
+            while(dir != NULL) {   // as long as there is a token (directory), run this loop
+                char * absPath = (char *) malloc(1 + strlen(dir) + strlen(args[0]) );   // allocate memory for absPath
+                strcpy(absPath, dir);   // copy string
                 char slash = '/';
-                strncat(absPath, &slash, 1);
-                strcat(absPath, args[0]);
+                strncat(absPath, &slash, 1);   // concatenate forward slash
+                strcat(absPath, args[0]);   // concatenate program name with absPath
 
                 if (isFileExists(absPath)) {   // this condition checks if the given program exists in directory
                     execv(absPath, args);   // if so, execute execv() from child process
                     fprintf(stderr, "An error must have happened when running execv()!");
-                    break;
+                    return(1);   // terminate the child process if execv() did not work properly
                 }
 
 		        dir = strtok(NULL, ":");
