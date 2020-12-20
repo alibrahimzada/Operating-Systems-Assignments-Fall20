@@ -80,20 +80,30 @@ void setup(char inputBuffer[], char *args[], int *background) {
 		printf("args %d = %s\n",i,args[i]);
 } /* end of setup routine */
 
-int isFileExists(const char *path) {
+int isFileExists(char *path) {
     // Check for file existence
-    if (access(path, F_OK) == -1)
+    if (access(path, F_OK | X_OK) == -1)
         return 0;
 
     return 1;
 }
 
+struct backgroundProcess {
+    pid_t backgroundProcessId;
+    char *processName;
+    struct backgroundProcess *nextBackgroundProcess;
+};
+
 int main(void) {
     char inputBuffer[MAX_LINE]; /*buffer to hold command entered */
     int background; /* equals 1 if a command is followed by '&' */
     char *args[MAX_LINE/2 + 1]; /*command line arguments */
+    int programExecution;
+    struct backgroundProcess *linkedListHead = NULL;
     while (1) {
         background = 0;
+        programExecution = 1;   // this variable will be used to differentiate between different requirements
+
         printf("myshell: ");
         /*setup() calls exit() when Control-D is entered */
         setup(inputBuffer, args, &background);
@@ -103,41 +113,81 @@ int main(void) {
         (2) the child process will invoke execv()
         (3) if background == 0, the parent will wait,
         otherwise it will invoke the setup() function again. */
-
-        pid_t childpid;
-
-        if ( (childpid = fork()) == -1 ) {   // this condition is to check if fork was successfull
-            fprintf(stderr, "failed to fork!");
-            continue;
-        }
         
-        if ( childpid == 0 ) {    // this condition is true when the processor schedules the child process
-            char* path = getenv("PATH");   // this returns all of the dirs in PATH env variable
-            if (path == NULL) {   // this condition is to check if PATH is empty
-                fprintf(stderr, "getenv returned NULL");
-                continue;
+        // this if condition will turn off execution mode and perform its task (ps_all)
+        if (strcmp(args[0], "ps_all") == 0) {
+            programExecution = 0;
+            struct backgroundProcess *linkedListNode = linkedListHead;
+            int jobID = 1;
+
+            while (linkedListNode != NULL) {
+                printf("[%d] %s (pid=%d)\n", jobID, linkedListNode->processName, linkedListNode->backgroundProcessId);
+
+                linkedListNode = linkedListNode->nextBackgroundProcess;
+                jobID++;
             }
+        }
 
-            char *dir = strtok(path, ":");   // tokenize with a delimitir
-            while(dir != NULL) {   // as long as there is a token (directory), run this loop
-                char * absPath = (char *) malloc(1 + strlen(dir) + strlen(args[0]) );   // allocate memory for absPath
-                strcpy(absPath, dir);   // copy string
-                char slash = '/';
-                strncat(absPath, &slash, 1);   // concatenate forward slash
-                strcat(absPath, args[0]);   // concatenate program name with absPath
+        if (programExecution) {
+            pid_t childpid;
+            if ( (childpid = fork()) == -1 ) {   // this condition is to check if fork was successfull
+                fprintf(stderr, "failed to fork!");
+                continue;
+            } else if (childpid == 0) {   // this condition is true when the processor schedules the child process
 
-                if (isFileExists(absPath)) {   // this condition checks if the given program exists in directory
-                    execv(absPath, args);   // if so, execute execv() from child process
-                    fprintf(stderr, "An error must have happened when running execv()!");
-                    return(1);   // terminate the child process if execv() did not work properly
+                char *path = getenv("PATH");   // this returns all of the dirs in PATH env variable
+                if (path == NULL) {   // this condition is to check if PATH is empty
+                    fprintf(stderr, "getenv returned NULL\n");
+                    exit(0);
                 }
 
-		        dir = strtok(NULL, ":");
-	        }
-        }
+                char *dir = strtok(path, ":");   // tokenize with a delimitir
+                while(dir != NULL) {   // as long as there is a token (directory), run this loop
+                    char *absPath = (char *) malloc(1 + strlen(dir) + strlen(args[0]) );   // allocate memory for absPath
+                    strcpy(absPath, dir);   // copy string
+                    strcat(absPath, "/");   // concatenate forward slash
+                    strcat(absPath, args[0]);   // concatenate program name with absPath
 
-        if ( !background && wait(NULL) != childpid ) {   // needs some editing
-            fprintf(stderr, "A signal must have interrupted the wait!");
+                    if (isFileExists(absPath)) {   // this condition checks if the given program exists in directory
+                        execv(absPath, args);   // if so, execute execv() from child process
+                        fprintf(stderr, "An error must have happened when running execv()!");
+                        return(1);   // terminate the child process if execv() did not work properly
+                    }
+
+		            dir = strtok(NULL, ":");
+	            }
+
+            } else {   // this condition is true when the processor schedules the parent process
+                if (background == 0) {
+                    waitpid(childpid, NULL, 0);
+                } else {
+                    struct backgroundProcess *linkedListNode = NULL;
+
+                    if (linkedListHead == NULL) {
+                        linkedListNode = (struct backgroundProcess *) malloc(sizeof(struct backgroundProcess));
+                        linkedListNode->backgroundProcessId = childpid;
+                        linkedListNode->processName = *args;
+                        linkedListNode->nextBackgroundProcess = NULL;
+                        linkedListHead = linkedListNode;
+                    } else {
+                        linkedListNode = linkedListHead;
+
+                        do {
+                            if (linkedListNode->nextBackgroundProcess == NULL) {
+                                break;
+                            }
+                            linkedListNode = linkedListNode->nextBackgroundProcess;
+                        } while (linkedListNode != NULL);
+
+                        struct backgroundProcess *currentProcessNode = NULL;
+                        currentProcessNode = (struct backgroundProcess *) malloc(sizeof(struct backgroundProcess));
+                        currentProcessNode->backgroundProcessId = childpid;
+                        linkedListNode->processName = *args;
+                        currentProcessNode->nextBackgroundProcess = NULL;
+                        linkedListNode->nextBackgroundProcess=currentProcessNode;
+                    }
+                }
+            }
         }
     }
 }
