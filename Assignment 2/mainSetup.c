@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
  
 #define MAX_LINE 80 /* 80 chars per line, per command, should be enough. */
  
@@ -97,7 +98,7 @@ struct backgroundProcess {
 
 void copyArgs(char **dest, char **src) {
 	int i;
-	for (i = 0; src[i] != NULL; i++) {
+	for (i = 0; (src[i] != NULL) && (*src[i] != '&'); i++) {
 		dest[i] = strdup(src[i]);
 	}
 	dest[i] = NULL;
@@ -108,6 +109,7 @@ int main(void) {
     int background; /* equals 1 if a command is followed by '&' */
     char *args[MAX_LINE/2 + 1]; /*command line arguments */
     int programExecution;
+	int backgroundProcessStatus;
     struct backgroundProcess *linkedListHead = NULL;
     while (1) {
         background = 0;
@@ -134,7 +136,7 @@ int main(void) {
 				if (waitpid(childProcessId, NULL, WNOHANG) == 0) {
 					char **arguments = linkedListNode->commandLineArgs;
 					printf("	[%d]  ", linkedListNode->processJobId);
-					for (int i = 0; *arguments[i] != '&'; i++) {
+					for (int i = 0; arguments[i] != NULL; i++) {
 						printf("%s ", arguments[i]);
 					}
 					printf("(Pid=%d) \n", linkedListNode->backgroundProcessId);
@@ -149,7 +151,7 @@ int main(void) {
 				if (waitpid(childProcessId, NULL, WNOHANG) == childProcessId) {
 					char **arguments = linkedListNode->commandLineArgs;
 					printf("	[%d]  ", linkedListNode->processJobId);
-					for (int i = 0; *arguments[i] != '&'; i++) {
+					for (int i = 0; arguments[i] != NULL; i++) {
 						printf("%s ", arguments[i]);
 					}
 					printf("(Pid=%d) \n", linkedListNode->backgroundProcessId);
@@ -157,6 +159,32 @@ int main(void) {
 				linkedListNode = linkedListNode->nextBackgroundProcess;
 			}
         }
+
+		if (strcmp(args[0], "exit") == 0) {
+			programExecution = 0;
+			backgroundProcessStatus = 1;
+
+			struct backgroundProcess *linkedListNode = linkedListHead;
+
+			while (linkedListNode != NULL) {
+				while (waitpid(-1, NULL, WNOHANG) >= 1) {
+					;
+				}
+
+				int status = kill(linkedListNode->backgroundProcessId, 0);
+				if (status == 0) {
+					fprintf(stderr, "dear user, you have background processes still running. close them first then exit.\n");
+					backgroundProcessStatus = 0;
+					break;
+				}
+
+				linkedListNode = linkedListNode->nextBackgroundProcess;
+			}
+
+			if (backgroundProcessStatus) {
+				exit(0);
+			}
+		}
 
         if (programExecution) {
             pid_t childpid;
@@ -179,7 +207,9 @@ int main(void) {
                     strcat(absPath, args[0]);   // concatenate program name with absPath
 
                     if (isFileExists(absPath)) {   // this condition checks if the given program exists in directory
-                        execv(absPath, args);   // if so, execute execv() from child process
+						char **arguments = malloc(sizeof(char*) * MAX_LINE / 2 + 1);
+						copyArgs(arguments, args);
+                        execv(absPath, arguments);   // if so, execute execv() from child process
                         fprintf(stderr, "An error must have happened when running execv()!");
                         return(1);   // terminate the child process if execv() did not work properly
                     }
