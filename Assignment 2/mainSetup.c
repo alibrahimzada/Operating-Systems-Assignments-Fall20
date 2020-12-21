@@ -89,6 +89,7 @@ int isFileExists(char *path) {
 }
 
 struct backgroundProcess {
+	int processJobId;
     pid_t backgroundProcessId;
     char **commandLineArgs;
     struct backgroundProcess *nextBackgroundProcess;
@@ -125,22 +126,36 @@ int main(void) {
         // this if condition will turn off execution mode and perform its task (ps_all)
         if (strcmp(args[0], "ps_all") == 0) {
             programExecution = 0;
-            struct backgroundProcess *linkedListNode = linkedListHead;
-            int jobID = 1;
 
 			printf("Running:\n");
+			struct backgroundProcess *linkedListNode = linkedListHead;
             while (linkedListNode != NULL) {
-				char **temp = linkedListNode->commandLineArgs;
-				printf("	[%d]  ", jobID);
-				for (int i = 0; *temp[i] != '&'; i++) {
-					printf("%s ", temp[i]);
+				pid_t childProcessId = linkedListNode->backgroundProcessId;
+				if (waitpid(childProcessId, NULL, WNOHANG) == 0) {
+					char **arguments = linkedListNode->commandLineArgs;
+					printf("	[%d]  ", linkedListNode->processJobId);
+					for (int i = 0; *arguments[i] != '&'; i++) {
+						printf("%s ", arguments[i]);
+					}
+					printf("(Pid=%d) \n", linkedListNode->backgroundProcessId);
 				}
-				printf("(Pid=%d) \n", linkedListNode->backgroundProcessId);
-                linkedListNode = linkedListNode->nextBackgroundProcess;
-                jobID++;
+				linkedListNode = linkedListNode->nextBackgroundProcess;
             }
 
 			printf("\nFinished:\n");
+			linkedListNode = linkedListHead;
+			while (linkedListNode != NULL) {
+				pid_t childProcessId = linkedListNode->backgroundProcessId;
+				if (waitpid(childProcessId, NULL, WNOHANG) == childProcessId) {
+					char **arguments = linkedListNode->commandLineArgs;
+					printf("	[%d]  ", linkedListNode->processJobId);
+					for (int i = 0; *arguments[i] != '&'; i++) {
+						printf("%s ", arguments[i]);
+					}
+					printf("(Pid=%d) \n", linkedListNode->backgroundProcessId);
+				}
+				linkedListNode = linkedListNode->nextBackgroundProcess;
+			}
         }
 
         if (programExecution) {
@@ -185,6 +200,7 @@ int main(void) {
 						copyArgs(copiedArgs, args);
                         linkedListNode->commandLineArgs = copiedArgs;
                         linkedListNode->nextBackgroundProcess = NULL;
+						linkedListNode->processJobId = 1;
                         linkedListHead = linkedListNode;
                     } else {
                         linkedListNode = linkedListHead;
@@ -201,8 +217,10 @@ int main(void) {
                         currentProcessNode->backgroundProcessId = childpid;
 						char **copiedArgs = malloc(sizeof(char*) * MAX_LINE / 2 + 1);
 						copyArgs(copiedArgs, args);
-                        linkedListNode->commandLineArgs = copiedArgs;
+                        currentProcessNode->commandLineArgs = copiedArgs;
                         currentProcessNode->nextBackgroundProcess = NULL;
+						int currentJobId = linkedListNode->processJobId;
+						currentProcessNode->processJobId = currentJobId + 1;
                         linkedListNode->nextBackgroundProcess=currentProcessNode;
                     }
                 }
