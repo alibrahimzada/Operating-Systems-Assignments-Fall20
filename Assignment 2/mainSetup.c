@@ -90,9 +90,17 @@ int isFileExists(char *path) {
 
 struct backgroundProcess {
     pid_t backgroundProcessId;
-    char *processName;
+    char **commandLineArgs;
     struct backgroundProcess *nextBackgroundProcess;
 };
+
+void copyArgs(char **dest, char **src) {
+	int i;
+	for (i = 0; src[i] != NULL; i++) {
+		dest[i] = strdup(src[i]);
+	}
+	dest[i] = NULL;
+}
 
 int main(void) {
     char inputBuffer[MAX_LINE]; /*buffer to hold command entered */
@@ -120,12 +128,19 @@ int main(void) {
             struct backgroundProcess *linkedListNode = linkedListHead;
             int jobID = 1;
 
+			printf("Running:\n");
             while (linkedListNode != NULL) {
-                printf("[%d] %s (pid=%d)\n", jobID, linkedListNode->processName, linkedListNode->backgroundProcessId);
-
+				char **temp = linkedListNode->commandLineArgs;
+				printf("	[%d]  ", jobID);
+				for (int i = 0; *temp[i] != '&'; i++) {
+					printf("%s ", temp[i]);
+				}
+				printf("(Pid=%d) \n", linkedListNode->backgroundProcessId);
                 linkedListNode = linkedListNode->nextBackgroundProcess;
                 jobID++;
             }
+
+			printf("\nFinished:\n");
         }
 
         if (programExecution) {
@@ -166,7 +181,9 @@ int main(void) {
                     if (linkedListHead == NULL) {
                         linkedListNode = (struct backgroundProcess *) malloc(sizeof(struct backgroundProcess));
                         linkedListNode->backgroundProcessId = childpid;
-                        linkedListNode->processName = *args;
+						char **copiedArgs = malloc(sizeof(char*) * MAX_LINE / 2 + 1);
+						copyArgs(copiedArgs, args);
+                        linkedListNode->commandLineArgs = copiedArgs;
                         linkedListNode->nextBackgroundProcess = NULL;
                         linkedListHead = linkedListNode;
                     } else {
@@ -182,7 +199,9 @@ int main(void) {
                         struct backgroundProcess *currentProcessNode = NULL;
                         currentProcessNode = (struct backgroundProcess *) malloc(sizeof(struct backgroundProcess));
                         currentProcessNode->backgroundProcessId = childpid;
-                        linkedListNode->processName = *args;
+						char **copiedArgs = malloc(sizeof(char*) * MAX_LINE / 2 + 1);
+						copyArgs(copiedArgs, args);
+                        linkedListNode->commandLineArgs = copiedArgs;
                         currentProcessNode->nextBackgroundProcess = NULL;
                         linkedListNode->nextBackgroundProcess=currentProcessNode;
                     }
