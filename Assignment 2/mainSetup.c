@@ -124,7 +124,13 @@ int main(void) {
         (2) the child process will invoke execv()
         (3) if background == 0, the parent will wait,
         otherwise it will invoke the setup() function again. */
-        
+
+		// this condition is to check whether the user entered any commands
+		if (args[0] == NULL) {
+			fprintf(stderr, "no command entered, try again!\n");
+			continue;
+		}
+
         // this if condition will turn off execution mode and perform its task (ps_all)
         if (strcmp(args[0], "ps_all") == 0) {
             programExecution = 0;
@@ -160,6 +166,8 @@ int main(void) {
 			}
         }
 
+		// <exit>
+		// the following block contains the functionality of exit
 		if (strcmp(args[0], "exit") == 0) {
 			programExecution = 0;
 			backgroundProcessStatus = 1;
@@ -167,7 +175,7 @@ int main(void) {
 			struct backgroundProcess *linkedListNode = linkedListHead;
 
 			while (linkedListNode != NULL) {
-				while (waitpid(-1, NULL, WNOHANG) >= 1) {
+				if (waitpid(linkedListNode->backgroundProcessId, NULL, WNOHANG) >= 1) {
 					;
 				}
 
@@ -185,7 +193,10 @@ int main(void) {
 				exit(0);
 			}
 		}
+		// </exit>
 
+		// <execution>
+		// the following block contains the program execution
         if (programExecution) {
             pid_t childpid;
             if ( (childpid = fork()) == -1 ) {   // this condition is to check if fork was successfull
@@ -256,5 +267,6 @@ int main(void) {
                 }
             }
         }
+		// </execution>
     }
 }
