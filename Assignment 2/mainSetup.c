@@ -96,12 +96,29 @@ struct backgroundProcess {
     struct backgroundProcess *nextBackgroundProcess;
 };
 
+struct bookmark {
+	int index;
+	char **commandLineArgs;
+	struct bookmark *nextBookmark;
+};
+
 void copyArgs(char **dest, char **src) {
 	int i;
 	for (i = 0; (src[i] != NULL) && (*src[i] != '&'); i++) {
 		dest[i] = strdup(src[i]);
 	}
 	dest[i] = NULL;
+}
+
+void copyBookmarkArgs(char **dest, char **src) {
+	int i;
+	for (i = 1; src[i] != NULL; i++) {
+		dest[i-1] = strdup(src[i]);
+	}
+	strcpy(dest[0], dest[0] + 1);   // get rid of " in the first token
+	strncpy(dest[i-2], dest[i-2], strlen(dest[i-2])-1);  // getting rid of " from the final token
+	dest[i-2][strlen(dest[i-2])-1] = '\0';
+	dest[i-1] = NULL;
 }
 
 void removeLLNode(struct backgroundProcess *currentPointer) {
@@ -116,7 +133,8 @@ int main(void) {
     char *args[MAX_LINE/2 + 1]; /*command line arguments */
     int programExecution;
 	int backgroundProcessStatus;
-    struct backgroundProcess *linkedListHead = NULL;
+    struct backgroundProcess *bgLLHead = NULL;
+	struct bookmark *bmLLHead = NULL;
     while (1) {
         background = 0;
         programExecution = 1;   // this variable will be used to differentiate between different requirements
@@ -142,38 +160,100 @@ int main(void) {
         if (strcmp(args[0], "ps_all") == 0) {
             programExecution = 0;
 
-			struct backgroundProcess *linkedListNode = linkedListHead;
+			struct backgroundProcess *bgLLNode = bgLLHead;
 			printf("Finished:\n");
-			while (linkedListNode != NULL) {
-				pid_t childProcessId = linkedListNode->backgroundProcessId;
+			while (bgLLNode != NULL) {
+				pid_t childProcessId = bgLLNode->backgroundProcessId;
 				if (waitpid(childProcessId, NULL, WNOHANG) == childProcessId) {
-					char **arguments = linkedListNode->commandLineArgs;
-					printf("   [%d]  ", linkedListNode->processJobId);
+					char **arguments = bgLLNode->commandLineArgs;
+					printf("   [%d]  ", bgLLNode->processJobId);
 					for (int i = 0; arguments[i] != NULL; i++) {
 						printf("%s ", arguments[i]);
 					}
-					printf("(Pid=%d) \n", linkedListNode->backgroundProcessId);
-					removeLLNode(linkedListNode);
+					printf("(Pid=%d) \n", bgLLNode->backgroundProcessId);
+					removeLLNode(bgLLNode);
 				}
-				linkedListNode = linkedListNode->nextBackgroundProcess;
+				bgLLNode = bgLLNode->nextBackgroundProcess;
 			}
 
 			printf("\nRunning:\n");
-			linkedListNode = linkedListHead;
-			while (linkedListNode != NULL) {
-				pid_t childProcessId = linkedListNode->backgroundProcessId;
+			bgLLNode = bgLLHead;
+			while (bgLLNode != NULL) {
+				pid_t childProcessId = bgLLNode->backgroundProcessId;
 				if (waitpid(childProcessId, NULL, WNOHANG) == 0) {
-					char **arguments = linkedListNode->commandLineArgs;
-					printf("   [%d]  ", linkedListNode->processJobId);
+					char **arguments = bgLLNode->commandLineArgs;
+					printf("   [%d]  ", bgLLNode->processJobId);
 					for (int i = 0; arguments[i] != NULL; i++) {
 						printf("%s ", arguments[i]);
 					}
-					printf("(Pid=%d) \n", linkedListNode->backgroundProcessId);
+					printf("(Pid=%d) \n", bgLLNode->backgroundProcessId);
 				}
-				linkedListNode = linkedListNode->nextBackgroundProcess;
+				bgLLNode = bgLLNode->nextBackgroundProcess;
 			}
         }
 		// </ps_all>
+
+		// <bookmark>
+		if (strcmp(args[0], "bookmark") == 0) {
+			programExecution = 0;
+
+			// this condition is used to list all of the bookmarked commands
+			if (strcmp(args[1], "-l") == 0) {
+				struct bookmark *bmLLNode = bmLLHead;
+				while (bmLLNode != NULL) {
+					char **bmArguments = bmLLNode->commandLineArgs;
+					fprintf(stdout, "   %d  \" ", bmLLNode->index);
+					for (int i = 0; bmArguments[i] != NULL; i++) {
+						fprintf(stdout, "%s ", bmArguments[i]);
+					}
+					fprintf(stdout, "\"\n");
+					bmLLNode = bmLLNode->nextBookmark;
+				}
+			}
+
+			// this condition is used to execute a bookmarked command given its index
+			else if (strcmp(args[1], "-i") == 0) {
+				;
+			}
+
+			// this condition is used to delete a command from bookmark given its index
+			else if (strcmp(args[1], "-d") == 0) {
+				;
+			}
+
+			// this condition is used to add a new bookmarked command
+			else {
+				struct bookmark *bmLLNode = NULL;
+				if (bmLLHead == NULL) {
+					bmLLNode = (struct bookmark *) malloc(sizeof(struct bookmark));
+					bmLLNode->index = 0;
+					char **bookmarkArgs = malloc(sizeof(char*) * MAX_LINE / 2 + 1);
+					copyBookmarkArgs(bookmarkArgs, args);
+					bmLLNode->commandLineArgs = bookmarkArgs;
+					bmLLNode->nextBookmark = NULL;
+					bmLLHead = bmLLNode;
+				} else {
+					bmLLNode = bmLLHead;
+					do {
+						if (bmLLNode->nextBookmark == NULL) {
+							break;
+						}
+						bmLLNode = bmLLNode->nextBookmark;
+					} while (bmLLNode != NULL);
+
+					struct bookmark *currentBMNode = (struct bookmark *) malloc(sizeof(struct bookmark));
+					char **bookmarkArgs = malloc(sizeof(char*) * MAX_LINE / 2 + 1);
+					copyBookmarkArgs(bookmarkArgs, args);
+					currentBMNode->commandLineArgs = bookmarkArgs;
+					currentBMNode->nextBookmark = NULL;
+					int currentIndex = bmLLNode->index;
+					currentBMNode->index = currentIndex + 1;
+					bmLLNode->nextBookmark = currentBMNode;
+                }
+
+			}
+		}
+		// </bookmark>
 
 		// <exit>
 		// the following block contains the functionality of exit
@@ -181,21 +261,21 @@ int main(void) {
 			programExecution = 0;
 			backgroundProcessStatus = 1;
 
-			struct backgroundProcess *linkedListNode = linkedListHead;
+			struct backgroundProcess *bgLLNode = bgLLHead;
 
-			while (linkedListNode != NULL) {
-				if (waitpid(linkedListNode->backgroundProcessId, NULL, WNOHANG) >= 1) {
+			while (bgLLNode != NULL) {
+				if (waitpid(bgLLNode->backgroundProcessId, NULL, WNOHANG) >= 1) {
 					;
 				}
 
-				int status = kill(linkedListNode->backgroundProcessId, 0);
+				int status = kill(bgLLNode->backgroundProcessId, 0);
 				if (status == 0) {
 					fprintf(stderr, "dear user, you have background processes still running. close them first then exit.\n");
 					backgroundProcessStatus = 0;
 					break;
 				}
 
-				linkedListNode = linkedListNode->nextBackgroundProcess;
+				bgLLNode = bgLLNode->nextBackgroundProcess;
 			}
 
 			if (backgroundProcessStatus) {
@@ -241,37 +321,37 @@ int main(void) {
                 if (background == 0) {
                     waitpid(childpid, NULL, 0);
                 } else {
-                    struct backgroundProcess *linkedListNode = NULL;
+                    struct backgroundProcess *bgLLNode = NULL;
 
-                    if (linkedListHead == NULL) {
-                        linkedListNode = (struct backgroundProcess *) malloc(sizeof(struct backgroundProcess));
-                        linkedListNode->backgroundProcessId = childpid;
-						char **copiedArgs = malloc(sizeof(char*) * MAX_LINE / 2 + 1);
-						copyArgs(copiedArgs, args);
-                        linkedListNode->commandLineArgs = copiedArgs;
-                        linkedListNode->nextBackgroundProcess = NULL;
-						linkedListNode->processJobId = 1;
-                        linkedListHead = linkedListNode;
+                    if (bgLLHead == NULL) {
+                        bgLLNode = (struct backgroundProcess *) malloc(sizeof(struct backgroundProcess));
+                        bgLLNode->backgroundProcessId = childpid;
+						char **bgArgs = malloc(sizeof(char*) * MAX_LINE / 2 + 1);
+						copyArgs(bgArgs, args);
+                        bgLLNode->commandLineArgs = bgArgs;
+                        bgLLNode->nextBackgroundProcess = NULL;
+						bgLLNode->processJobId = 1;
+                        bgLLHead = bgLLNode;
                     } else {
-                        linkedListNode = linkedListHead;
+                        bgLLNode = bgLLHead;
 
                         do {
-                            if (linkedListNode->nextBackgroundProcess == NULL) {
+                            if (bgLLNode->nextBackgroundProcess == NULL) {
                                 break;
                             }
-                            linkedListNode = linkedListNode->nextBackgroundProcess;
-                        } while (linkedListNode != NULL);
+                            bgLLNode = bgLLNode->nextBackgroundProcess;
+                        } while (bgLLNode != NULL);
 
-                        struct backgroundProcess *currentProcessNode = NULL;
-                        currentProcessNode = (struct backgroundProcess *) malloc(sizeof(struct backgroundProcess));
-                        currentProcessNode->backgroundProcessId = childpid;
-						char **copiedArgs = malloc(sizeof(char*) * MAX_LINE / 2 + 1);
-						copyArgs(copiedArgs, args);
-                        currentProcessNode->commandLineArgs = copiedArgs;
-                        currentProcessNode->nextBackgroundProcess = NULL;
-						int currentJobId = linkedListNode->processJobId;
-						currentProcessNode->processJobId = currentJobId + 1;
-                        linkedListNode->nextBackgroundProcess=currentProcessNode;
+                        struct backgroundProcess *currentBGNode = NULL;
+                        currentBGNode = (struct backgroundProcess *) malloc(sizeof(struct backgroundProcess));
+                        currentBGNode->backgroundProcessId = childpid;
+						char **bgArgs = malloc(sizeof(char*) * MAX_LINE / 2 + 1);
+						copyArgs(bgArgs, args);
+                        currentBGNode->commandLineArgs = bgArgs;
+                        currentBGNode->nextBackgroundProcess = NULL;
+						int currentJobId = bgLLNode->processJobId;
+						currentBGNode->processJobId = currentJobId + 1;
+                        bgLLNode->nextBackgroundProcess=currentBGNode;
                     }
                 }
             }
