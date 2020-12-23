@@ -104,6 +104,12 @@ void copyArgs(char **dest, char **src) {
 	dest[i] = NULL;
 }
 
+void removeLLNode(struct backgroundProcess *currentPointer) {
+	struct backgroundProcess *tempPointer = currentPointer;
+	tempPointer = currentPointer->nextBackgroundProcess;
+	currentPointer = tempPointer;
+}
+
 int main(void) {
     char inputBuffer[MAX_LINE]; /*buffer to hold command entered */
     int background; /* equals 1 if a command is followed by '&' */
@@ -131,32 +137,34 @@ int main(void) {
 			continue;
 		}
 
+		// <ps_all>
         // this if condition will turn off execution mode and perform its task (ps_all)
         if (strcmp(args[0], "ps_all") == 0) {
             programExecution = 0;
 
-			printf("Running:\n");
 			struct backgroundProcess *linkedListNode = linkedListHead;
-            while (linkedListNode != NULL) {
-				pid_t childProcessId = linkedListNode->backgroundProcessId;
-				if (waitpid(childProcessId, NULL, WNOHANG) == 0) {
-					char **arguments = linkedListNode->commandLineArgs;
-					printf("	[%d]  ", linkedListNode->processJobId);
-					for (int i = 0; arguments[i] != NULL; i++) {
-						printf("%s ", arguments[i]);
-					}
-					printf("(Pid=%d) \n", linkedListNode->backgroundProcessId);
-				}
-				linkedListNode = linkedListNode->nextBackgroundProcess;
-            }
-
-			printf("\nFinished:\n");
-			linkedListNode = linkedListHead;
+			printf("Finished:\n");
 			while (linkedListNode != NULL) {
 				pid_t childProcessId = linkedListNode->backgroundProcessId;
 				if (waitpid(childProcessId, NULL, WNOHANG) == childProcessId) {
 					char **arguments = linkedListNode->commandLineArgs;
-					printf("	[%d]  ", linkedListNode->processJobId);
+					printf("   [%d]  ", linkedListNode->processJobId);
+					for (int i = 0; arguments[i] != NULL; i++) {
+						printf("%s ", arguments[i]);
+					}
+					printf("(Pid=%d) \n", linkedListNode->backgroundProcessId);
+					removeLLNode(linkedListNode);
+				}
+				linkedListNode = linkedListNode->nextBackgroundProcess;
+			}
+
+			printf("\nRunning:\n");
+			linkedListNode = linkedListHead;
+			while (linkedListNode != NULL) {
+				pid_t childProcessId = linkedListNode->backgroundProcessId;
+				if (waitpid(childProcessId, NULL, WNOHANG) == 0) {
+					char **arguments = linkedListNode->commandLineArgs;
+					printf("   [%d]  ", linkedListNode->processJobId);
 					for (int i = 0; arguments[i] != NULL; i++) {
 						printf("%s ", arguments[i]);
 					}
@@ -165,6 +173,7 @@ int main(void) {
 				linkedListNode = linkedListNode->nextBackgroundProcess;
 			}
         }
+		// </ps_all>
 
 		// <exit>
 		// the following block contains the functionality of exit
