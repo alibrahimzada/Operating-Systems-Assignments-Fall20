@@ -1,9 +1,12 @@
+#include <sys/wait.h>
+#include <sys/types.h> 
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#include <stdbool.h>
  
 #define MAX_LINE 80 /* 80 chars per line, per command, should be enough. */
  
@@ -11,6 +14,9 @@
 in the next command line; separate it into distinct arguments (using blanks as
 delimiters), and set the args array entries to point to the beginning of what
 will become null-terminated, C-style strings. */
+
+bool isFg = true;
+int fg;
 
 void setup(char inputBuffer[], char *args[], int *background) {
     int length, /* # of characters in the command line */
@@ -127,6 +133,26 @@ void removeLLNode(struct backgroundProcess *currentPointer) {
 	currentPointer = tempPointer;
 }
 
+void catchCTRLZ(int sigNo){
+	int exit_stat;
+	if (isFg) { //checks if there is any fg process
+		kill(fg,0); //checks if fg process is still running, if it is not then it sets errno to ESRCH
+		if (errno != ESRCH) {
+			kill(fg, SIGKILL); //because there is a fg process still running it send a kill signal
+			waitpid(-fg, &exit_stat, WNOHANG);//checks if any zombie children exits 
+			isFg = false;
+		} else {
+			fprintf(stderr, "There is no foreground process which is still running");
+			isFg=false;
+			printf("\nmyshell:");
+			fflush(stdout);				
+		}
+	} else {
+		printf("\nmyshell:");
+		fflush(stdout);
+	}
+}
+
 int main(void) {
     char inputBuffer[MAX_LINE]; /*buffer to hold command entered */
     int background; /* equals 1 if a command is followed by '&' */
@@ -135,6 +161,21 @@ int main(void) {
 	int backgroundProcessStatus;
     struct backgroundProcess *bgLLHead = NULL;
 	struct bookmark *bmLLHead = NULL;
+
+	struct sigaction act;
+	act.sa_handler=catchCTRLZ;
+	act.sa_flags=SA_RESTART;
+	int stat=sigemptyset(&act.sa_mask);
+	if (stat == -1) {
+		perror("Error to initialize signal set");
+		exit(1);
+	}
+	stat=sigaction(SIGTSTP,&act,NULL);
+	if (stat==-1) {
+		perror("Error to set signal handler for SIGTSTP");
+		exit(1);
+	}
+
     while (1) {
         background = 0;
         programExecution = 1;   // this variable will be used to differentiate between different requirements
@@ -159,11 +200,12 @@ int main(void) {
         // this if condition will turn off execution mode and perform its task (ps_all)
         if (strcmp(args[0], "ps_all") == 0) {
             programExecution = 0;
+	    	pid_t childProcessId;
 
 			struct backgroundProcess *bgLLNode = bgLLHead;
 			printf("Finished:\n");
 			while (bgLLNode != NULL) {
-				pid_t childProcessId = bgLLNode->backgroundProcessId;
+				childProcessId = bgLLNode->backgroundProcessId;
 				if (waitpid(childProcessId, NULL, WNOHANG) == childProcessId) {
 					char **arguments = bgLLNode->commandLineArgs;
 					printf("   [%d]  ", bgLLNode->processJobId);
@@ -319,7 +361,10 @@ int main(void) {
 
             } else {   // this condition is true when the processor schedules the parent process
                 if (background == 0) {
-                    waitpid(childpid, NULL, 0);
+					fg=childpid;
+					isFg=true;
+                	waitpid(childpid, NULL, 0);
+					isFg = false;
                 } else {
                     struct backgroundProcess *bgLLNode = NULL;
 
