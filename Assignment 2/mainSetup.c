@@ -87,6 +87,19 @@ void setup(char inputBuffer[], char *args[], int *background) {
 		printf("args %d = %s\n",i,args[i]);
 } /* end of setup routine */
 
+struct backgroundProcess {
+	char **commandLineArgs;
+	struct backgroundProcess *nextBackgroundProcess;
+	pid_t backgroundProcessId;
+	int processJobId;
+};
+
+struct bookmark {
+	char **commandLineArgs;
+	struct bookmark *nextBookmark;
+	int index;
+};
+
 int isFileExists(char *path) {
     // Check for file existence
     if (access(path, F_OK | X_OK) == -1)
@@ -94,19 +107,6 @@ int isFileExists(char *path) {
 
     return 1;
 }
-
-struct backgroundProcess {
-	int processJobId;
-    pid_t backgroundProcessId;
-    char **commandLineArgs;
-    struct backgroundProcess *nextBackgroundProcess;
-};
-
-struct bookmark {
-	int index;
-	char **commandLineArgs;
-	struct bookmark *nextBookmark;
-};
 
 void copyArgs(char **dest, char **src) {
 	int i;
@@ -255,7 +255,16 @@ int main(void) {
 
 			// this condition is used to execute a bookmarked command given its index
 			else if (strcmp(args[1], "-i") == 0) {
-				;
+				struct bookmark *bmLLNode = bmLLHead;
+				while (bmLLNode != NULL) {
+					int index = bmLLNode->index;
+					if ((*args[2] - '0') == index) {
+						copyArgs(args, bmLLNode->commandLineArgs);
+						programExecution = 1;
+						break;
+					}
+					bmLLNode = bmLLNode->nextBookmark;
+				}
 			}
 
 			// this condition is used to delete a command from bookmark given its index
@@ -325,7 +334,6 @@ int main(void) {
 			}
 		}
 		// </exit>
-
 		// <execution>
 		// the following block contains the program execution
         if (programExecution) {
