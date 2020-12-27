@@ -133,6 +133,23 @@ void removeLLNode(struct backgroundProcess *currentPointer) {
 	currentPointer = tempPointer;
 }
 
+void shiftLLNodes(struct bookmark *next, struct bookmark *prev, struct bookmark **head) {
+	struct bookmark *tempPointer = NULL;
+	if (next == *head) {
+		tempPointer = *head;
+		*head = next->nextBookmark;
+	} else {
+		tempPointer = next;
+		prev->nextBookmark = next->nextBookmark;
+	}
+
+	int index = tempPointer->index;
+	while (tempPointer->nextBookmark != NULL) {
+		tempPointer = tempPointer->nextBookmark;
+		tempPointer->index = index++;
+	}
+}
+
 void catchCTRLZ(int sigNo){
 	int exit_stat;
 	if (isFg) { //checks if there is any fg process
@@ -269,7 +286,17 @@ int main(void) {
 
 			// this condition is used to delete a command from bookmark given its index
 			else if (strcmp(args[1], "-d") == 0) {
-				;
+				struct bookmark *nextNode = bmLLHead;
+				struct bookmark *prevNode = NULL;
+				while (nextNode != NULL) {
+					int index = nextNode->index;
+					if ((*args[2] - '0') == index) {
+						shiftLLNodes(nextNode, prevNode, &bmLLHead);
+						break;
+					}
+					prevNode = nextNode;
+					nextNode = nextNode->nextBookmark;
+				}
 			}
 
 			// this condition is used to add a new bookmarked command
