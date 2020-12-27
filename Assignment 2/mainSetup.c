@@ -7,9 +7,18 @@
 #include <string.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <sys/stat.h>
+#include <sys/resource.h>
+#include <fcntl.h>
  
 #define MAX_LINE 80 /* 80 chars per line, per command, should be enough. */
- 
+
+//flags:
+#define CREATE_FLAGS1 (O_WRONLY|O_CREAT|O_TRUNC)
+#define CREATE_FLAGS2 (O_WRONLY|O_CREAT|O_APPEND)
+#define CREATE_MODE (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)
+#define readOnly_Flag O_RDONLY
+
 /* The setup function below will not return any value, but it will just: read
 in the next command line; separate it into distinct arguments (using blanks as
 delimiters), and set the args array entries to point to the beginning of what
@@ -361,77 +370,251 @@ int main(void) {
 			}
 		}
 		// </exit>
+
 		// <execution>
 		// the following block contains the program execution
         if (programExecution) {
             pid_t childpid;
-            if ( (childpid = fork()) == -1 ) {   // this condition is to check if fork was successfull
+			int redirectionMode = 0;
+			char inputFile[MAX_LINE/2+1], outputFile[MAX_LINE/2+1];
+			int fd;
+			int fd2;
+
+            if ((childpid = fork()) == -1 ) {   // this condition is to check if fork was successfull
                 fprintf(stderr, "failed to fork!");
                 continue;
+
             } else if (childpid == 0) {   // this condition is true when the processor schedules the child process
 
-                char *path = getenv("PATH");   // this returns all of the dirs in PATH env variable
-                if (path == NULL) {   // this condition is to check if PATH is empty
-                    fprintf(stderr, "getenv returned NULL\n");
-                    exit(0);
-                }
+				for (int i = 0; args[i] != NULL; i++) {
 
-                char *dir = strtok(path, ":");   // tokenize with a delimitir
-                while(dir != NULL) {   // as long as there is a token (directory), run this loop
-                    char *absPath = (char *) malloc(1 + strlen(dir) + strlen(args[0]) );   // allocate memory for absPath
-                    strcpy(absPath, dir);   // copy string
-                    strcat(absPath, "/");   // concatenate forward slash
-                    strcat(absPath, args[0]);   // concatenate program name with absPath
+					if (strcmp(args[i], ">") == 0) {   // checks if redirection is in create/truncate mode
+						if (*(args + i + 1) == NULL) {   // if there is no output file gives necessary warnings
+							fprintf(stderr, "A file should have been provided\n");
+							exit(1);
+						}
+						args[i] = NULL;
+						redirectionMode = 1;   // sets 1 if its in create/truncate mode for later checks
+						strcpy(outputFile, *(args + i + 1));   // copy output file name
+						break;
 
-                    if (isFileExists(absPath)) {   // this condition checks if the given program exists in directory
+					} else if (strcmp(args[i], ">>") == 0) {   //checks if redirection is in create/append mode
+						if (*(args + i + 1) == NULL) {
+							fprintf(stderr, "A file should have been provided\n");
+							exit(1);
+						}
+						args[i]=NULL;
+						redirectionMode = 2;   // sets 2 if its in create/append mode for later checks
+						strcpy(outputFile, *(args + i + 1));   // copy output file name
+						break;
+
+					} else if(strcmp(args[i], "<") == 0) {   // checks if redirection is in input mode
+						if (*(args + i + 1) == NULL) {
+							fprintf(stderr, "A file should have been provided\n");
+							exit(1);
+						}
+						args[i] = NULL;
+						redirectionMode = 3;   //sets 3 if its in input mode
+						strcpy(inputFile, *(args + i + 1));
+						if (*(args + i + 2) != NULL && strcmp(args[i+2], ">") == 0) {   //there is an output redirection so it is been handling here
+							if(*(args + i + 3) == NULL) {
+								fprintf(stderr, "A file should have been provided\n");
+								exit(1);
+							}
+							redirectionMode += 1;   // create/truncate + input mode=4
+							strcpy(outputFile, *(args + i + 3));
+							break;				
+						} else if (*(args + i + 2) == NULL) {
+							break; //because there is no output redirection					
+						}
+
+					} else if(strcmp(args[i], "2>") == 0) {   // checks if redirection is in error mode
+						if (*(args + i + 1) == NULL) {
+							fprintf(stderr,"A file should have been provided\n");
+							exit(1);
+						}
+						args[i]=NULL;
+						redirectionMode = 5; // sets 5 if redirection is in output error
+						strcpy(outputFile, *(args + i + 1));   // copy output file name
+						break;
+					}
+				}
+
+				switch (redirectionMode) {
+
+					// <case 1 : writing/truncation (>)>
+					case 1:
+						fd = open(outputFile, CREATE_FLAGS1, CREATE_MODE);   // open the output file
+						if (fd == -1) {   // error handling if file could not open
+							fprintf(stderr, "Failed to open the file");
+							exit(1);
+						}
+
+						if (dup2(fd, STDOUT_FILENO) == -1) {   // error handling if dup2 is unsuccessful
+							fprintf(stderr, "Failed to redirect standard output");
+							exit(1);
+						}
+
+						if (close(fd) == -1) {   // error handling when closing the file
+							fprintf(stderr, "Failed to close the file");
+							exit(1);
+						}
+						break;
+					// </case 1>
+
+					// <case 2 : appending (>>)>
+					case 2:
+						fd = open(outputFile, CREATE_FLAGS2, CREATE_MODE);   // open the output file
+						if (fd == -1) {   // error handling if file could not open
+							fprintf(stderr, "Failed to open the file");
+							exit(1);	
+						}
+						
+						if (dup2(fd, STDOUT_FILENO) == -1) {   // error handling if dup2 is unsuccessful
+							fprintf(stderr, "Failed to redirect standard output");
+							exit(1);
+						}
+
+						if (close(fd) == -1) {   // error handling when closing the file
+							fprintf(stderr, "Failed to close the file");
+							exit(1);
+						}
+						break;
+					// </case 2>
+
+					// <case 3 : reading (<)>
+					case 3:
+						fd = open(inputFile, readOnly_Flag);   // open the input file
+						if (fd == -1) {   // error handling if file could not open 
+							fprintf(stderr, "Failed to open the file");
+							exit(1);
+						}
+						
+						if (dup2(fd, STDIN_FILENO) == -1) {   // error handling if dup2 is unsuccessful
+							fprintf(stderr, "Failed to redirect standard input");
+							exit(1);
+						}
+
+						if (close(fd) == -1) {   // error handling when closing the file
+							fprintf(stderr, "Failed to close the file");
+							exit(1);
+						}
+						break;
+					// </case 3>
+
+					// <case 4 : reading and writing at the same time>
+					case 4:
+						fd = open(inputFile, readOnly_Flag);   // open the input file
+						fd2 = open(outputFile, CREATE_FLAGS1, CREATE_MODE);
+
+						if ((fd == -1) || (fd2 == -1)) {   // error handling if file could not open 
+							fprintf(stderr, "Failed to open the file");
+							exit(1);
+						}
+
+						if (dup2(fd, STDIN_FILENO) == -1) {   // error handling if dup2 is unsuccessful
+							fprintf(stderr, "Failed to redirect standard input");
+							exit(1);
+						}
+						
+						if (dup2(fd2, STDOUT_FILENO) == -1) {
+							fprintf(stderr, "Failed to redirect standard input");
+							exit(1);
+						}
+
+						if ((close(fd) == -1) || (close(fd2) == -1)) {   // error handling when closing the file
+							fprintf(stderr, "Failed to close the file");
+							exit(1);
+						}
+
+						break;
+					// </case 4>
+
+					// <case 5 : writing stderr (2>)>
+					case 5:
+						fd = open(outputFile, CREATE_FLAGS1, CREATE_MODE);
+						if (fd == -1) {
+							fprintf(stderr, "Failed to open the file");
+							exit(1);
+						}
+						
+						if (dup2(fd, STDERR_FILENO) == -1) {
+							fprintf(stderr, "Failed to redirect standard output");
+							exit(1);
+						}
+
+						if (close(fd) == -1) {
+							fprintf(stderr, "Failed to close the file");
+							exit(1);
+						}
+						break;
+					// </case 5>
+				}
+
+				char *path = getenv("PATH");   // this returns all of the dirs in PATH env variable
+				if (path == NULL) {   // this condition is to check if PATH is empty
+					fprintf(stderr, "getenv returned NULL\n");
+					exit(1);
+				}
+
+				char *dir = strtok(path, ":");   // tokenize with a delimitir
+				while (dir != NULL) {   // as long as there is a token (directory), run this loop
+					char *absPath = (char *) malloc(1 + strlen(dir) + strlen(args[0]) );   // allocate memory for absPath
+					strcpy(absPath, dir);   // copy string
+					strcat(absPath, "/");   // concatenate forward slash
+					strcat(absPath, args[0]);   // concatenate program name with absPath
+
+					if (isFileExists(absPath)) {   // this condition checks if the given program exists in directory
 						char **arguments = malloc(sizeof(char*) * MAX_LINE / 2 + 1);
 						copyArgs(arguments, args);
-                        execv(absPath, arguments);   // if so, execute execv() from child process
-                        fprintf(stderr, "An error must have happened when running execv()!");
-                        return(1);   // terminate the child process if execv() did not work properly
-                    }
+						execv(absPath, arguments);   // if so, execute execv() from child process
+						fprintf(stderr, "An error must have happened when running execv()!");
+						exit(1);   // terminate the child process if execv() did not work properly
+					}
 
-		            dir = strtok(NULL, ":");
-	            }
+					dir = strtok(NULL, ":");
+				}
 
             } else {   // this condition is true when the processor schedules the parent process
-                if (background == 0) {
-					fg=childpid;
-					isFg=true;
-                	waitpid(childpid, NULL, 0);
+                if (background == 0) {   // this condition is true if the process is foreground
+					fg = childpid;
+					isFg = true;
+                	waitpid(childpid, NULL, 0);   // wait for the child until its terminated
 					isFg = false;
-                } else {
+
+                } else {   // this condition is true if the process is background
                     struct backgroundProcess *bgLLNode = NULL;
 
-                    if (bgLLHead == NULL) {
-                        bgLLNode = (struct backgroundProcess *) malloc(sizeof(struct backgroundProcess));
-                        bgLLNode->backgroundProcessId = childpid;
-						char **bgArgs = malloc(sizeof(char*) * MAX_LINE / 2 + 1);
-						copyArgs(bgArgs, args);
-                        bgLLNode->commandLineArgs = bgArgs;
-                        bgLLNode->nextBackgroundProcess = NULL;
-						bgLLNode->processJobId = 1;
-                        bgLLHead = bgLLNode;
-                    } else {
+                    if (bgLLHead == NULL) {   // this condition is true if there are no nodes in the linkedlist yet
+                        bgLLNode = (struct backgroundProcess *) malloc(sizeof(struct backgroundProcess));   // allocate memory for the node
+                        bgLLNode->backgroundProcessId = childpid;   // set the node's background process id
+						char **bgArgs = malloc(sizeof(char*) * MAX_LINE / 2 + 1);   // create an auxiliary args array
+						copyArgs(bgArgs, args);   // copy arguments to the auxiliary array
+                        bgLLNode->commandLineArgs = bgArgs;   // set the command line arguments of the node
+                        bgLLNode->nextBackgroundProcess = NULL;   // set the next node as NULL
+						bgLLNode->processJobId = 1;   // set the job id
+                        bgLLHead = bgLLNode;   // assign the created node to linked list head
+
+                    } else {   // this condition is true, if there are at least 1 node in the linked list
                         bgLLNode = bgLLHead;
 
-                        do {
+                        do {   // this loop will traverse over the linked list to get its final node
                             if (bgLLNode->nextBackgroundProcess == NULL) {
                                 break;
                             }
                             bgLLNode = bgLLNode->nextBackgroundProcess;
                         } while (bgLLNode != NULL);
 
-                        struct backgroundProcess *currentBGNode = NULL;
+                        struct backgroundProcess *currentBGNode = NULL;   // create and allocate memory to a node
                         currentBGNode = (struct backgroundProcess *) malloc(sizeof(struct backgroundProcess));
-                        currentBGNode->backgroundProcessId = childpid;
-						char **bgArgs = malloc(sizeof(char*) * MAX_LINE / 2 + 1);
-						copyArgs(bgArgs, args);
-                        currentBGNode->commandLineArgs = bgArgs;
-                        currentBGNode->nextBackgroundProcess = NULL;
-						int currentJobId = bgLLNode->processJobId;
+                        currentBGNode->backgroundProcessId = childpid;   // set the background process id
+						char **bgArgs = malloc(sizeof(char*) * MAX_LINE / 2 + 1);   // create an auxiliary args array
+						copyArgs(bgArgs, args);   // copy args
+                        currentBGNode->commandLineArgs = bgArgs;   // set command line args
+                        currentBGNode->nextBackgroundProcess = NULL;   // set the next as NULL
+						int currentJobId = bgLLNode->processJobId;   // get the previous node's job id, increment and assign it to new node
 						currentBGNode->processJobId = currentJobId + 1;
-                        bgLLNode->nextBackgroundProcess=currentBGNode;
+                        bgLLNode->nextBackgroundProcess=currentBGNode;   // add newly created node to the end of linked list
                     }
                 }
             }
