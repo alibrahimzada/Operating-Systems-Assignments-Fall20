@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dirent.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <sys/stat.h>
@@ -179,6 +180,60 @@ void catchCTRLZ(int sigNo){
 	}
 }
 
+int search(char pwd[], int isRecursive, char keyword[]) {
+	DIR *dir;
+	struct dirent *dirEnt;
+	dir = opendir(pwd);
+	if (dir == NULL) {
+		fprintf(stderr, "directory does not exist\n");
+		return 1;
+	}
+
+	while ((dirEnt = readdir(dir)) != NULL) {
+		if (isRecursive && dirEnt->d_type == 4 && strcmp(dirEnt->d_name, "..") != 0 && strcmp(dirEnt->d_name, ".") != 0) {
+			char *absPath = (char *) malloc(1 + strlen(pwd) + strlen(dirEnt->d_name));   // allocate memory for absPath
+			strcpy(absPath, pwd);   // copy string
+			strcat(absPath, "/");   // concatenate forward slash
+			strcat(absPath, dirEnt->d_name);   // concatenate program name with absPath
+			search(absPath, isRecursive, keyword);
+		}
+
+		char *filename = dirEnt->d_name;
+		int mode = 0;
+
+		for (int i = 0; filename[i] != '\0'; i++) {
+			if (*(filename + i) == '.' && *(filename + i + 1) == 'c') {
+				mode = 1;
+			}
+		}
+
+		if (!mode) {
+			continue;
+		}
+
+		char lineBuffer[1000];
+		FILE *file;
+
+		if ((file = fopen(dirEnt->d_name, "r")) == NULL) {
+			fprintf(stderr, "file does not exist!");
+			exit(1);
+		}
+
+		char *status1;
+		int line = 0;
+		do {
+			status1 = fgets(lineBuffer, sizeof(lineBuffer), file);
+			if (strstr(lineBuffer, keyword) != NULL) {
+				printf("%d: %s/%s -> %s", line, pwd, dirEnt->d_name, lineBuffer);
+			}
+			line++;
+		} while (status1);
+
+		fclose(file);
+	}
+	closedir(dir);
+}
+
 int main(void) {
     char inputBuffer[MAX_LINE]; /*buffer to hold command entered */
     int background; /* equals 1 if a command is followed by '&' */
@@ -260,6 +315,27 @@ int main(void) {
 			}
         }
 		// </ps_all>
+
+		// <search>
+		if (strcmp(args[0], "search") == 0) {
+			char lineBuffer[1000];
+			char keyword[10];   // we assume the search word can be at most 10 chars, although its easily changeable
+			int isRecursive = 0;
+			programExecution = 0;
+
+			if (args[1] == NULL) {   // this condition is to check if a keyword is provided
+				fprintf(stderr, "a keyword should have been provided\n");
+				continue;
+			} else if (strcmp(args[1], "-r") == 0) {   // this condition is to check if we do a recursive search
+				isRecursive = 1;
+				strncpy(keyword, args[2] + 1, strlen(args[2]) - 2);
+			} else {   // this condition is to check if we do a non recursive search
+				strncpy(keyword, args[1] + 1, strlen(args[1]) - 2);
+			}
+
+			search(".", isRecursive, keyword);
+		}
+		// </search>
 
 		// <bookmark>
 		if (strcmp(args[0], "bookmark") == 0) {
@@ -517,7 +593,7 @@ int main(void) {
 							exit(1);
 						}
 						
-						if (dup2(fd2, STDOUT_FILENO) == -1) {
+						if (dup2(fd2, STDOUT_FILENO) == -1) {   // error handling if dup2 is unsuccessful
 							fprintf(stderr, "Failed to redirect standard input");
 							exit(1);
 						}
@@ -532,18 +608,18 @@ int main(void) {
 
 					// <case 5 : writing stderr (2>)>
 					case 5:
-						fd = open(outputFile, CREATE_FLAGS1, CREATE_MODE);
-						if (fd == -1) {
+						fd = open(outputFile, CREATE_FLAGS1, CREATE_MODE);   // open the input file
+						if (fd == -1) {   // error handling if file could not open 
 							fprintf(stderr, "Failed to open the file");
 							exit(1);
 						}
 						
-						if (dup2(fd, STDERR_FILENO) == -1) {
+						if (dup2(fd, STDERR_FILENO) == -1) {   // error handling if dup2 is unsuccessful
 							fprintf(stderr, "Failed to redirect standard output");
 							exit(1);
 						}
 
-						if (close(fd) == -1) {
+						if (close(fd) == -1) {   // error handling when closing the file
 							fprintf(stderr, "Failed to close the file");
 							exit(1);
 						}
