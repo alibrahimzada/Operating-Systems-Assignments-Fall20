@@ -195,19 +195,28 @@ int search(char pwd[], int isRecursive, char keyword[]) {
 		strcat(absPath, "/");   // concatenate forward slash
 		strcat(absPath, dirEnt->d_name);   // concatenate program name with absPath
 
+		// this condition is used to check if the search is running in recursive mode
 		if (isRecursive && dirEnt->d_type == 4 && strcmp(dirEnt->d_name, "..") != 0 && strcmp(dirEnt->d_name, ".") != 0) {
 			search(absPath, isRecursive, keyword);
 		}
 
-		char *filename = dirEnt->d_name;
-		int mode = 0;
+		char *filename = dirEnt->d_name;   // a pointer to filename
+		int mode = 0;   // this mode is used to check if we have a .c, .C, .h, or .H file
 
+		// the following conditions check for eligible file extensions
 		for (int i = 0; filename[i] != '\0'; i++) {
-			if (*(filename + i) == '.' && *(filename + i + 1) == 'c') {
+			if (*(filename + i) == '.' && *(filename + i + 1) == 'c' && *(filename + i + 2) == '\0') {
+				mode = 1;
+			} else if (*(filename + i) == '.' && *(filename + i + 1) == 'C' && *(filename + i + 2) == '\0') {
+				mode = 1;
+			} else if (*(filename + i) == '.' && *(filename + i + 1) == 'h' && *(filename + i + 2) == '\0') {
+				mode = 1;
+			} else if (*(filename + i) == '.' && *(filename + i + 1) == 'H' && *(filename + i + 2) == '\0') {
 				mode = 1;
 			}
 		}
 
+		// if no eligible file exists, then continue with the next file
 		if (!mode) {
 			continue;
 		}
@@ -215,14 +224,14 @@ int search(char pwd[], int isRecursive, char keyword[]) {
 		char lineBuffer[1000];
 		FILE *file;
 
-		if ((file = fopen(absPath, "r")) == NULL) {
+		if ((file = fopen(absPath, "r")) == NULL) {   // this condition opens the file
 			fprintf(stderr, "file does not exist!");
 			exit(1);
 		}
 
 		char *status1;
 		int line = 0;
-		do {
+		do {   // this loop gets a line of file in its iteration, and checks if the substring exists
 			status1 = fgets(lineBuffer, sizeof(lineBuffer), file);
 			if (strstr(lineBuffer, keyword) != NULL) {
 				printf("%d: %s/%s -> %s", line, pwd, dirEnt->d_name, lineBuffer);
