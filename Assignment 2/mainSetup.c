@@ -190,11 +190,12 @@ int search(char pwd[], int isRecursive, char keyword[]) {
 	}
 
 	while ((dirEnt = readdir(dir)) != NULL) {
+		char *absPath = (char *) malloc(1 + strlen(pwd) + strlen(dirEnt->d_name));   // allocate memory for absPath
+		strcpy(absPath, pwd);   // copy string
+		strcat(absPath, "/");   // concatenate forward slash
+		strcat(absPath, dirEnt->d_name);   // concatenate program name with absPath
+
 		if (isRecursive && dirEnt->d_type == 4 && strcmp(dirEnt->d_name, "..") != 0 && strcmp(dirEnt->d_name, ".") != 0) {
-			char *absPath = (char *) malloc(1 + strlen(pwd) + strlen(dirEnt->d_name));   // allocate memory for absPath
-			strcpy(absPath, pwd);   // copy string
-			strcat(absPath, "/");   // concatenate forward slash
-			strcat(absPath, dirEnt->d_name);   // concatenate program name with absPath
 			search(absPath, isRecursive, keyword);
 		}
 
@@ -214,7 +215,7 @@ int search(char pwd[], int isRecursive, char keyword[]) {
 		char lineBuffer[1000];
 		FILE *file;
 
-		if ((file = fopen(dirEnt->d_name, "r")) == NULL) {
+		if ((file = fopen(absPath, "r")) == NULL) {
 			fprintf(stderr, "file does not exist!");
 			exit(1);
 		}
@@ -232,6 +233,8 @@ int search(char pwd[], int isRecursive, char keyword[]) {
 		fclose(file);
 	}
 	closedir(dir);
+
+	return 0;
 }
 
 int main(void) {
@@ -332,7 +335,6 @@ int main(void) {
 			} else {   // this condition is to check if we do a non recursive search
 				strncpy(keyword, args[1] + 1, strlen(args[1]) - 2);
 			}
-
 			search(".", isRecursive, keyword);
 		}
 		// </search>
