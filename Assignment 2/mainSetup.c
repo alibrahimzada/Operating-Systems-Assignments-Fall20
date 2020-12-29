@@ -1,15 +1,12 @@
-#include <sys/wait.h>
-#include <sys/types.h> 
+#include <sys/wait.h>   // include necessary wait functions
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-#include <dirent.h>
+#include <dirent.h>   // include necessary directory handling functions
 #include <signal.h>
 #include <stdbool.h>
-#include <sys/stat.h>
-#include <sys/resource.h>
 #include <fcntl.h>
  
 #define MAX_LINE 80 /* 80 chars per line, per command, should be enough. */
@@ -25,6 +22,7 @@ in the next command line; separate it into distinct arguments (using blanks as
 delimiters), and set the args array entries to point to the beginning of what
 will become null-terminated, C-style strings. */
 
+// global variables
 bool isFg = true;
 int fg;
 
@@ -97,39 +95,38 @@ void setup(char inputBuffer[], char *args[], int *background) {
 		printf("args %d = %s\n",i,args[i]);
 } /* end of setup routine */
 
-struct backgroundProcess {
-	char **commandLineArgs;
-	struct backgroundProcess *nextBackgroundProcess;
-	pid_t backgroundProcessId;
-	int processJobId;
+struct backgroundProcess {   // this struct represents a node in linkedlist when creating background processes
+	char **commandLineArgs;   // this field stores commands and arguments entered by user
+	struct backgroundProcess *nextBackgroundProcess;   // this field points to the next node in linkedlist
+	pid_t backgroundProcessId;   // this field stores the background process id
+	int processJobId;   // this field stores the job id of the background process
 };
 
-struct bookmark {
-	char **commandLineArgs;
-	struct bookmark *nextBookmark;
-	int index;
+struct bookmark {   // this struct represents a node in linkedlist when creating bookmarks
+	char **commandLineArgs;   // this field stores commands and arguments entered by user
+	struct bookmark *nextBookmark;   // this field points to the next node in linkedlist
+	int index;   // this field stores the index of the this node in linkedlist
 };
 
-int isFileExists(char *path) {
-    // Check for file existence
+int isFileExists(char *path) {   // this function is used to check if a file exists in the given path
     if (access(path, F_OK | X_OK) == -1)
         return 0;
 
     return 1;
 }
 
-void copyArgs(char **dest, char **src) {
+void copyArgs(char **dest, char **src) {   // this function is used to copy the command line args to another array
 	int i;
-	for (i = 0; (src[i] != NULL) && (*src[i] != '&'); i++) {
-		dest[i] = strdup(src[i]);
+	for (i = 0; (src[i] != NULL) && (*src[i] != '&'); i++) {   // stop at either null or & (because processes can run in background)
+		dest[i] = strdup(src[i]);   // dubplicate each element
 	}
 	dest[i] = NULL;
 }
 
-void copyBookmarkArgs(char **dest, char **src) {
-	int i;
+void copyBookmarkArgs(char **dest, char **src) {   // this function is used to copy the command line args of bookmark to another array.
+	int i;										   // the difference with copyArgs() is that it takes care of "" in the source array
 	for (i = 1; src[i] != NULL; i++) {
-		dest[i-1] = strdup(src[i]);
+		dest[i-1] = strdup(src[i]);   // duplicate each element
 	}
 	strcpy(dest[0], dest[0] + 1);   // get rid of " in the first token
 	strncpy(dest[i-2], dest[i-2], strlen(dest[i-2])-1);  // getting rid of " from the final token
@@ -137,42 +134,42 @@ void copyBookmarkArgs(char **dest, char **src) {
 	dest[i-1] = NULL;
 }
 
-void removeLLNode(struct backgroundProcess *currentPointer) {
-	struct backgroundProcess *tempPointer = currentPointer;
-	tempPointer = currentPointer->nextBackgroundProcess;
-	currentPointer = tempPointer;
+void removeLLNode(struct backgroundProcess *currentPointer) {   // this function is used to delete a given node from the linkedlist
+	struct backgroundProcess *tempPointer = currentPointer;   // create a temproray pointer
+	tempPointer = currentPointer->nextBackgroundProcess;   // get the next node
+	currentPointer = tempPointer;   // assign this node's pointer to next node's one
 }
 
-void shiftLLNodes(struct bookmark *next, struct bookmark *prev, struct bookmark **head) {
-	struct bookmark *tempPointer = NULL;
-	if (next == *head) {
+void shiftLLNodes(struct bookmark *next, struct bookmark *prev, struct bookmark **head) {   // this function is used to shift the contents of linkedlist
+	struct bookmark *tempPointer = NULL;													// when a node is being deleted
+	if (next == *head) {   // check if the head of linkedlist is being deleted
 		tempPointer = *head;
 		*head = next->nextBookmark;
-	} else {
+	} else {   // check if other nodes are being deleted
 		tempPointer = next;
 		prev->nextBookmark = next->nextBookmark;
 	}
 
-	int index = tempPointer->index;
+	int index = tempPointer->index;   // loop over the remaining nodes and update their index field
 	while (tempPointer->nextBookmark != NULL) {
 		tempPointer = tempPointer->nextBookmark;
 		tempPointer->index = index++;
 	}
 }
 
-void catchCTRLZ(int sigNo){
+void catchCTRLZ(int sigNo) {   // this function is the handler when ctrl-Z is being presses
 	int exit_stat;
-	if (isFg) { //checks if there is any fg process
-		kill(fg,0); //checks if fg process is still running, if it is not then it sets errno to ESRCH
+	if (isFg) {   //checks if there are any foreground processes
+		kill(fg, 0);   //checks if foreground process is still running, if it is not then it sets errno to ESRCH
 		if (errno != ESRCH) {
-			kill(fg, SIGKILL); //because there is a fg process still running it send a kill signal
-			waitpid(-fg, &exit_stat, WNOHANG);//checks if any zombie children exits 
+			kill(fg, SIGKILL);   //because there is a foreground process still running it sends a kill signal
+			waitpid(-fg, &exit_stat, WNOHANG);   //checks if any zombie children exits 
 			isFg = false;
 		} else {
 			fprintf(stderr, "There is no foreground process which is still running");
-			isFg=false;
+			isFg = false;
 			printf("\nmyshell:");
-			fflush(stdout);				
+			fflush(stdout);
 		}
 	} else {
 		printf("\nmyshell:");
@@ -180,7 +177,7 @@ void catchCTRLZ(int sigNo){
 	}
 }
 
-int search(char pwd[], int isRecursive, char keyword[]) {
+int search(char pwd[], int isRecursive, char keyword[]) {   // this function searches for the given keyword in files of pwd
 	DIR *dir;
 	struct dirent *dirEnt;
 	dir = opendir(pwd);
@@ -189,7 +186,7 @@ int search(char pwd[], int isRecursive, char keyword[]) {
 		return 1;
 	}
 
-	while ((dirEnt = readdir(dir)) != NULL) {
+	while ((dirEnt = readdir(dir)) != NULL) {   // loop over all files and directories in present working directory
 		char *absPath = (char *) malloc(1 + strlen(pwd) + strlen(dirEnt->d_name));   // allocate memory for absPath
 		strcpy(absPath, pwd);   // copy string
 		strcat(absPath, "/");   // concatenate forward slash
@@ -197,7 +194,7 @@ int search(char pwd[], int isRecursive, char keyword[]) {
 
 		// this condition is used to check if the search is running in recursive mode
 		if (isRecursive && dirEnt->d_type == 4 && strcmp(dirEnt->d_name, "..") != 0 && strcmp(dirEnt->d_name, ".") != 0) {
-			search(absPath, isRecursive, keyword);
+			search(absPath, isRecursive, keyword);   // recursive call to search in the new directory
 		}
 
 		char *filename = dirEnt->d_name;   // a pointer to filename
@@ -205,13 +202,8 @@ int search(char pwd[], int isRecursive, char keyword[]) {
 
 		// the following conditions check for eligible file extensions
 		for (int i = 0; filename[i] != '\0'; i++) {
-			if (*(filename + i) == '.' && *(filename + i + 1) == 'c' && *(filename + i + 2) == '\0') {
-				mode = 1;
-			} else if (*(filename + i) == '.' && *(filename + i + 1) == 'C' && *(filename + i + 2) == '\0') {
-				mode = 1;
-			} else if (*(filename + i) == '.' && *(filename + i + 1) == 'h' && *(filename + i + 2) == '\0') {
-				mode = 1;
-			} else if (*(filename + i) == '.' && *(filename + i + 1) == 'H' && *(filename + i + 2) == '\0') {
+			char ext = *(filename + i + 1);
+			if (*(filename + i) == '.' && (ext == 'c' || ext == 'C' || ext == 'h' || ext == 'H') && *(filename + i + 2) == '\0') {
 				mode = 1;
 			}
 		}
@@ -221,7 +213,7 @@ int search(char pwd[], int isRecursive, char keyword[]) {
 			continue;
 		}
 
-		char lineBuffer[1000];
+		char lineBuffer[1000];   // this array is used to store each line of the eligible file
 		FILE *file;
 
 		if ((file = fopen(absPath, "r")) == NULL) {   // this condition opens the file
@@ -229,20 +221,18 @@ int search(char pwd[], int isRecursive, char keyword[]) {
 			exit(1);
 		}
 
-		char *status1;
+		char *status;   // this status is true until we reach EOF
 		int line = 0;
 		do {   // this loop gets a line of file in its iteration, and checks if the substring exists
-			status1 = fgets(lineBuffer, sizeof(lineBuffer), file);
+			status = fgets(lineBuffer, sizeof(lineBuffer), file);
 			if (strstr(lineBuffer, keyword) != NULL) {
-				printf("%d: %s/%s -> %s", line, pwd, dirEnt->d_name, lineBuffer);
+				printf("%d: %s/%s -> %s", line, pwd, dirEnt->d_name, lineBuffer);   // print matched line
 			}
 			line++;
-		} while (status1);
-
+		} while (status);
 		fclose(file);
 	}
 	closedir(dir);
-
 	return 0;
 }
 
@@ -250,15 +240,15 @@ int main(void) {
     char inputBuffer[MAX_LINE]; /*buffer to hold command entered */
     int background; /* equals 1 if a command is followed by '&' */
     char *args[MAX_LINE/2 + 1]; /*command line arguments */
-    int programExecution;
-	int backgroundProcessStatus;
-    struct backgroundProcess *bgLLHead = NULL;
-	struct bookmark *bmLLHead = NULL;
+    int programExecution;   // this variable is used to check if we are in execution mode or in built-in functions mode
+	int backgroundProcessStatus;   // this variable is used to check if there are any background processes before exit function
+    struct backgroundProcess *bgLLHead = NULL;   // this pointer is used to point to the head of linkedlist which keeps background processes
+	struct bookmark *bmLLHead = NULL;   // this pointer is used to point to the head of linkedlist which keeps bookmarked items
 
 	struct sigaction act;
-	act.sa_handler=catchCTRLZ;
-	act.sa_flags=SA_RESTART;
-	int stat=sigemptyset(&act.sa_mask);
+	act.sa_handler = catchCTRLZ;   // determine the handler for the signal
+	act.sa_flags = SA_RESTART;   // determine the flags for the signal
+	int stat = sigemptyset(&act.sa_mask);
 	if (stat == -1) {
 		perror("Error to initialize signal set");
 		exit(1);
