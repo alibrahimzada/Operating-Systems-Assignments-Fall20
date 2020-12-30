@@ -8,6 +8,7 @@
 #include <signal.h>
 #include <stdbool.h>
 #include <fcntl.h>
+#include <termios.h>   // include necessary directive for terminal history
  
 #define MAX_LINE 80 /* 80 chars per line, per command, should be enough. */
 
@@ -107,6 +108,14 @@ struct bookmark {   // this struct represents a node in linkedlist when creating
 	struct bookmark *nextBookmark;   // this field points to the next node in linkedlist
 	int index;   // this field stores the index of the this node in linkedlist
 };
+
+struct commandHistory {
+	char line[MAX_LINE];
+	struct commandHistory *prevArg;
+	struct commandHistory *nextArg;
+};
+
+static struct termios old, current;
 
 int isFileExists(char *path) {   // this function is used to check if a file exists in the given path
     if (access(path, F_OK | X_OK) == -1)
@@ -234,6 +243,38 @@ int search(char pwd[], int isRecursive, char keyword[]) {   // this function sea
 	}
 	closedir(dir);
 	return 0;
+}
+
+/* Initialize new terminal i/o settings */
+void initTermios(int echo) {
+	tcgetattr(0, &old); /* grab old terminal i/o settings */
+  	current = old; /* make new settings same as old settings */
+  	current.c_lflag &= ~ICANON; /* disable buffered i/o */
+  	if(echo) {
+		current.c_lflag |= ECHO; /* set echo mode */
+  	}else {
+		current.c_lflag &= ~ECHO; /* set no echo mode */
+  	}
+  	tcsetattr(0, TCSANOW, &current); /* use these new terminal i/o settings now */
+}
+
+/* Restore old terminal i/o settings */
+void resetTermios(void) {
+	tcsetattr(0, TCSANOW, &old);
+}
+
+/* Read 1 character - echo defines echo mode */
+char getch_(int echo) {
+  	char ch;
+  	initTermios(echo);
+  	ch = getchar();
+  	resetTermios();
+  	return ch;
+}
+
+/* Read 1 character without echo */
+char getch(void) {
+	return getch_(0);
 }
 
 int main(void) {
