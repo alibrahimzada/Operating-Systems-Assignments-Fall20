@@ -302,9 +302,11 @@ int main(void) {
     struct backgroundProcess *bgLLHead = NULL;
 	struct bookmark *bmLLHead = NULL;
 	struct commandHistory *history = (struct commandHistory*) malloc(sizeof(struct commandHistory));
-	struct commandHistory *node = (struct commandHistory*) malloc(sizeof(struct commandHistory));
+	struct commandHistory *node = history;
 	history->prevArg = NULL;
 	history->nextArg = NULL;
+	strcpy(history->line, "");
+	int firstRun = 1;
 
 	struct sigaction act;
 	act.sa_handler=catchCTRLZ;
@@ -320,10 +322,8 @@ int main(void) {
 		exit(1);
 	}
 
-	char strBuff[LINES][MAX_LINE] = {"0"};
 	int c; // value of up and down arrows
-	int cnt = 0; // number of current line to be shown
-	int buffSize = 0;
+	int i;
 
     while (1) {
         background = 0;
@@ -332,31 +332,35 @@ int main(void) {
         printf("myshell: ");
 
 		system ("/bin/stty raw");
-		cnt = buffSize;
 		while ((c = getch()) == 27) {
 			if ((c = getch()) == 91) {
-				if ((c = getch()) == 66) {
+				if ((c = getch()) == 66) { // down arrow
 
 					if (history->nextArg != NULL) {
-						node = history;
 						history = history->nextArg;
-						history->prevArg = node;
-						fprintf(stdout, "\rmyshell: %s", history->line);
 
-						strcpy(inputBuffer, history->line);
+
+						printf("myshell: ");
+						char *eachArg = history->line;
+						for (i=0; (eachArg + i) != '\0'; i++)
+							fprintf(stdout, "%s ", eachArg+i);
+
+						printf("\n");
 					}
 
-				} else if (c == 65) {
+				} else if (c == 65) { // up arrow
 
-					if (history->prevArg != NULL) {
-						node = history;
-						history = history->prevArg;
-						history->nextArg = node;
-						fprintf(stdout, "\rmyshell: %s", history->line);
+					if (node->prevArg != NULL) {
+						node = node->prevArg;
 
-						strcpy(inputBuffer, history->line);
+
+						printf("myshell: ");
+						char *eachArg = node->line;
+						for (i=0; (eachArg + i) != '\0'; i++)
+							fprintf(stdout, "%s ", eachArg+i);
+
+						printf("\n");
 					}
-					
 				}
 			}
 		}
@@ -365,19 +369,28 @@ int main(void) {
         /*setup() calls exit() when Control-D is entered */
         setup(inputBuffer, args, &background);
 
-		while (node->prevArg != NULL) {
-			history = node;
-			node = node->prevArg;
-			node->nextArg = history;
-			
+		while (history->prevArg != NULL) {
+			history = history->prevArg;
 		}
-		node->prevArg = (struct commandHistory*) malloc(sizeof(struct commandHistory));
+		while (node->nextArg != NULL) {
+			node = node->nextArg;
+		}
 
-		strcpy(node->prevArg->line, inputBuffer);
-		node->prevArg->nextArg = node;
-		node->prevArg->prevArg = NULL;
-		history = node;
-        
+		if (firstRun) {
+			node->nextArg = (struct commandHistory*) malloc(sizeof(struct commandHistory));
+			node->nextArg->nextArg = NULL;
+			node->nextArg->prevArg = node;
+			node = node->nextArg;
+			firstRun = 0;
+		}
+
+		strcpy(node->line, inputBuffer);
+		node->nextArg = (struct commandHistory*) malloc(sizeof(struct commandHistory));
+		node->nextArg->nextArg = NULL;
+		node->nextArg->prevArg = node;
+		node = node->nextArg;
+		strcpy(node->line, "");
+
         /** the steps are:
         (1) fork a child process using fork()
         (2) the child process will invoke execv()
