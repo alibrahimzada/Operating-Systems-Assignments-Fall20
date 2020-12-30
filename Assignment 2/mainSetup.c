@@ -109,13 +109,13 @@ struct bookmark {   // this struct represents a node in linkedlist when creating
 	int index;   // this field stores the index of the this node in linkedlist
 };
 
-struct commandHistory {
-	char line[MAX_LINE];
-	struct commandHistory *prevArg;
-	struct commandHistory *nextArg;
+struct commandHistory {   // this struct represents a node in linkedlist when keeping history
+	char line[MAX_LINE];   // this field stores the commands
+	struct commandHistory *prevArg;   // pointer to previous history
+	struct commandHistory *nextArg;   // pointer to next history
 };
 
-static struct termios old, current;
+static struct termios old, current;   // keeps terminal settings
 
 int isFileExists(char *path) {   // this function is used to check if a file exists in the given path
     if (access(path, F_OK | X_OK) == -1)
@@ -245,25 +245,25 @@ int search(char pwd[], int isRecursive, char keyword[]) {   // this function sea
 	return 0;
 }
 
-/* Initialize new terminal i/o settings */
+// Initialize new terminal i/o settings
 void initTermios(int echo) {
-	tcgetattr(0, &old); /* grab old terminal i/o settings */
-  	current = old; /* make new settings same as old settings */
-  	current.c_lflag &= ~ICANON; /* disable buffered i/o */
+	tcgetattr(0, &old);   // grab old terminal i/o settings
+  	current = old;   // make new settings same as old settings
+  	current.c_lflag &= ~ICANON;   // disable buffered i/o
   	if(echo) {
-		current.c_lflag |= ECHO; /* set echo mode */
+		current.c_lflag |= ECHO;   // set echo mode
   	}else {
-		current.c_lflag &= ~ECHO; /* set no echo mode */
+		current.c_lflag &= ~ECHO;   // set no echo mode
   	}
-  	tcsetattr(0, TCSANOW, &current); /* use these new terminal i/o settings now */
+  	tcsetattr(0, TCSANOW, &current);   // use these new terminal i/o settings now
 }
 
-/* Restore old terminal i/o settings */
+// Restore old terminal i/o settings
 void resetTermios(void) {
 	tcsetattr(0, TCSANOW, &old);
 }
 
-/* Read 1 character - echo defines echo mode */
+// Read 1 character - echo defines echo mode
 char getch_(int echo) {
   	char ch;
   	initTermios(echo);
@@ -272,7 +272,7 @@ char getch_(int echo) {
   	return ch;
 }
 
-/* Read 1 character without echo */
+// Read 1 character without echo
 char getch(void) {
 	return getch_(0);
 }
@@ -286,6 +286,12 @@ int main(void) {
     struct backgroundProcess *bgLLHead = NULL;   // this pointer is used to point to the head of linkedlist which keeps background processes
 	struct bookmark *bmLLHead = NULL;   // this pointer is used to point to the head of linkedlist which keeps bookmarked items
 	int caseLoopVar = 0;
+	struct commandHistory *history = (struct commandHistory*) malloc(sizeof(struct commandHistory));
+	struct commandHistory *node = history;
+	history->prevArg = NULL;
+	history->nextArg = NULL;
+	strcpy(history->line, "");
+	int firstRun = 1;
 
 	struct sigaction act;
 	act.sa_handler = catchCTRLZ;   // determine the handler for the signal
@@ -308,6 +314,30 @@ int main(void) {
         programExecution = 1;   // this variable will be used to differentiate between different requirements
 
         printf("myshell: ");
+
+		int c; // value of up and down arrows
+
+		system ("/bin/stty raw");   // raw changes current terminal settings from line based to char based
+		while ((c = getch()) == 27) {   // check if character is ^
+			if ((c = getch()) == 91) {   // check for [[
+				if ((c = getch()) == 66) { // down arrow (check for B)
+
+					if (history->nextArg != NULL) {
+						history = history->nextArg;   // get the next history node
+						fprintf(stdout, "\rmyshell: %s", history->line);   // print its commands
+					}
+
+				} else if (c == 65) { // up arrow (check for A)
+
+					if (node->prevArg != NULL) {
+						node = node->prevArg;   // get the next history node
+						fprintf(stdout, "\rmyshell: %s", node->line);   // prints its commands
+					}
+				}
+			}
+		}
+		system ("/bin/stty cooked");   // cooked changes terminal settings to original one
+
         /*setup() calls exit() when Control-D is entered */
         setup(inputBuffer, args, &background);
         
@@ -316,6 +346,28 @@ int main(void) {
         (2) the child process will invoke execv()
         (3) if background == 0, the parent will wait,
         otherwise it will invoke the setup() function again. */
+
+		while (history->prevArg != NULL) {   // get the history linked list head
+			history = history->prevArg;
+		}
+		while (node->nextArg != NULL) {   // get the history linked list tail
+			node = node->nextArg;
+		}
+
+		if (firstRun) {   // check if its the first time creating a history node
+			node->nextArg = (struct commandHistory*) malloc(sizeof(struct commandHistory));
+			node->nextArg->nextArg = NULL;
+			node->nextArg->prevArg = node;
+			node = node->nextArg;
+			firstRun = 0;
+		}
+
+		strcpy(node->line, inputBuffer);   // copy input buffer to command line field of history node
+		node->nextArg = (struct commandHistory*) malloc(sizeof(struct commandHistory));
+		node->nextArg->nextArg = NULL;
+		node->nextArg->prevArg = node;
+		node = node->nextArg;
+		strcpy(node->line, "");
 
 		// this condition is to check whether the user entered any commands
 		if (args[0] == NULL) {
