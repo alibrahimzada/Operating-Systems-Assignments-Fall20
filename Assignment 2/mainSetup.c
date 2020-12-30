@@ -455,7 +455,6 @@ int main(void) {
             pid_t childpid;
 			int redirectionMode = 0;
 			char inputFile[MAX_LINE/2+1], outputFile[MAX_LINE/2+1];
-			strcpy(outputFile, "");
 			int fd;
 			int fd2;
 
@@ -633,6 +632,7 @@ int main(void) {
 
 					// <case 6 : pipe (|)>
 					case 6:
+						strcpy(outputFile, "");
 						do {
 							strcat(outputFile, args[caseLoopVar]);
 							if (args[caseLoopVar + 1] == NULL)
