@@ -244,6 +244,7 @@ int main(void) {
 	int backgroundProcessStatus;   // this variable is used to check if there are any background processes before exit function
     struct backgroundProcess *bgLLHead = NULL;   // this pointer is used to point to the head of linkedlist which keeps background processes
 	struct bookmark *bmLLHead = NULL;   // this pointer is used to point to the head of linkedlist which keeps bookmarked items
+	int caseLoopVar = 0;
 
 	struct sigaction act;
 	act.sa_handler = catchCTRLZ;   // determine the handler for the signal
@@ -514,6 +515,9 @@ int main(void) {
 						redirectionMode = 5; // sets 5 if redirection is in output error
 						strcpy(outputFile, *(args + i + 1));   // copy output file name
 						break;
+					} else if (strcmp(args[i], "|") == 0) {   // sets 6 if there is pip
+						redirectionMode = 6;
+						break;
 					}
 				}
 
@@ -603,7 +607,6 @@ int main(void) {
 							fprintf(stderr, "Failed to close the file");
 							exit(1);
 						}
-
 						break;
 					// </case 4>
 
@@ -626,6 +629,18 @@ int main(void) {
 						}
 						break;
 					// </case 5>
+
+					// <case 6 : pipe (|)>
+					case 6:
+						do {
+							strcat(outputFile, args[caseLoopVar]);
+							if (args[caseLoopVar + 1] == NULL)
+								break;
+							strcat(outputFile, " ");
+						} while (args[++caseLoopVar] != NULL);
+						system(outputFile);
+						exit(0);
+					// </case 6>
 				}
 
 				char *path = getenv("PATH");   // this returns all of the dirs in PATH env variable
