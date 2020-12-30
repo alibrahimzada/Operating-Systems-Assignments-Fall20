@@ -249,13 +249,15 @@ int main(void) {
 	struct sigaction act;
 	act.sa_handler = catchCTRLZ;   // determine the handler for the signal
 	act.sa_flags = SA_RESTART;   // determine the flags for the signal
-	int stat = sigemptyset(&act.sa_mask);
-	if (stat == -1) {
+	int stat = sigemptyset(&act.sa_mask);   // initialize the set
+
+	if (stat == -1) {   // condition to catch unsuccessful initialization
 		perror("Error to initialize signal set");
 		exit(1);
 	}
-	stat=sigaction(SIGTSTP,&act,NULL);
-	if (stat==-1) {
+
+	stat = sigaction(SIGTSTP, &act, NULL);   // setting signal handler
+	if (stat == -1) {   // condition to catch unsuccessful setting
 		perror("Error to set signal handler for SIGTSTP");
 		exit(1);
 	}
@@ -283,32 +285,32 @@ int main(void) {
 		// <ps_all>
         // this if condition will turn off execution mode and perform its task (ps_all)
         if (strcmp(args[0], "ps_all") == 0) {
-            programExecution = 0;
+            programExecution = 0;   // set program execution to 0 since this is a built-in functionality
 	    	pid_t childProcessId;
 
-			struct backgroundProcess *bgLLNode = bgLLHead;
+			struct backgroundProcess *bgLLNode = bgLLHead;   // retrieve the linked list head
 			printf("Finished:\n");
-			while (bgLLNode != NULL) {
+			while (bgLLNode != NULL) {   // loop over all nodes, check their status and find out if they are finished
 				childProcessId = bgLLNode->backgroundProcessId;
 				if (waitpid(childProcessId, NULL, WNOHANG) == childProcessId) {
 					char **arguments = bgLLNode->commandLineArgs;
-					printf("   [%d]  ", bgLLNode->processJobId);
+					printf("   [%d]  ", bgLLNode->processJobId);   // print the necessary information
 					for (int i = 0; arguments[i] != NULL; i++) {
 						printf("%s ", arguments[i]);
 					}
 					printf("(Pid=%d) \n", bgLLNode->backgroundProcessId);
-					removeLLNode(bgLLNode);
+					removeLLNode(bgLLNode);   // remove the node from linked list
 				}
 				bgLLNode = bgLLNode->nextBackgroundProcess;
 			}
 
 			printf("\nRunning:\n");
 			bgLLNode = bgLLHead;
-			while (bgLLNode != NULL) {
+			while (bgLLNode != NULL) {   // loop over all nodes, check their status and find out if they are still running
 				pid_t childProcessId = bgLLNode->backgroundProcessId;
 				if (waitpid(childProcessId, NULL, WNOHANG) == 0) {
 					char **arguments = bgLLNode->commandLineArgs;
-					printf("   [%d]  ", bgLLNode->processJobId);
+					printf("   [%d]  ", bgLLNode->processJobId);   // print the necessary information
 					for (int i = 0; arguments[i] != NULL; i++) {
 						printf("%s ", arguments[i]);
 					}
@@ -320,51 +322,52 @@ int main(void) {
 		// </ps_all>
 
 		// <search>
+		// this if condition will turn off execution mode and perform its task (search)
 		if (strcmp(args[0], "search") == 0) {
-			char lineBuffer[1000];
 			char keyword[10];   // we assume the search word can be at most 10 chars, although its easily changeable
 			int isRecursive = 0;
-			programExecution = 0;
+			programExecution = 0;   // set this to 0 since search is a built-in functionality
 
 			if (args[1] == NULL) {   // this condition is to check if a keyword is provided
 				fprintf(stderr, "a keyword should have been provided\n");
 				continue;
 			} else if (strcmp(args[1], "-r") == 0) {   // this condition is to check if we do a recursive search
-				isRecursive = 1;
-				strncpy(keyword, args[2] + 1, strlen(args[2]) - 2);
+				isRecursive = 1;   // set the flag to 1 in case of a recursive search
+				strncpy(keyword, args[2] + 1, strlen(args[2]) - 2);   // clean the keyword from ""s
 			} else {   // this condition is to check if we do a non recursive search
-				strncpy(keyword, args[1] + 1, strlen(args[1]) - 2);
+				strncpy(keyword, args[1] + 1, strlen(args[1]) - 2);   // clean the keyword from ""s
 			}
-			search(".", isRecursive, keyword);
+			search(".", isRecursive, keyword);   // call the search function
 		}
 		// </search>
 
 		// <bookmark>
+		// this if condition will turn off execution mode and perform its task (bookmark)
 		if (strcmp(args[0], "bookmark") == 0) {
-			programExecution = 0;
+			programExecution = 0;   // set this to 0 since bookmark is a built-in functionality
 
 			// this condition is used to list all of the bookmarked commands
 			if (strcmp(args[1], "-l") == 0) {
-				struct bookmark *bmLLNode = bmLLHead;
-				while (bmLLNode != NULL) {
-					char **bmArguments = bmLLNode->commandLineArgs;
-					fprintf(stdout, "   %d  \" ", bmLLNode->index);
+				struct bookmark *bmLLNode = bmLLHead;   // retrieve the bookmark linked list head
+				while (bmLLNode != NULL) {   // loop over all nodes in the linked list
+					char **bmArguments = bmLLNode->commandLineArgs;   // retrieve the node's command line arguments
+					printf("   %d  \" ", bmLLNode->index);   // print necessary information
 					for (int i = 0; bmArguments[i] != NULL; i++) {
-						fprintf(stdout, "%s ", bmArguments[i]);
+						printf("%s ", bmArguments[i]);
 					}
-					fprintf(stdout, "\"\n");
+					printf("\"\n");
 					bmLLNode = bmLLNode->nextBookmark;
 				}
 			}
 
 			// this condition is used to execute a bookmarked command given its index
 			else if (strcmp(args[1], "-i") == 0) {
-				struct bookmark *bmLLNode = bmLLHead;
-				while (bmLLNode != NULL) {
+				struct bookmark *bmLLNode = bmLLHead;   // retrieve bookmark linked list head
+				while (bmLLNode != NULL) {   // loop over all nodes in the linked list
 					int index = bmLLNode->index;
-					if ((*args[2] - '0') == index) {
+					if ((*args[2] - '0') == index) {   // if the given index matches with the node index, then break the loop
 						copyArgs(args, bmLLNode->commandLineArgs);
-						programExecution = 1;
+						programExecution = 1;   // set this to 1 because an execution needs to happen
 						break;
 					}
 					bmLLNode = bmLLNode->nextBookmark;
@@ -373,11 +376,11 @@ int main(void) {
 
 			// this condition is used to delete a command from bookmark given its index
 			else if (strcmp(args[1], "-d") == 0) {
-				struct bookmark *nextNode = bmLLHead;
-				struct bookmark *prevNode = NULL;
-				while (nextNode != NULL) {
+				struct bookmark *nextNode = bmLLHead;   // retrieve the bookmark linked list head
+				struct bookmark *prevNode = NULL;   // keep a pointer to previous node
+				while (nextNode != NULL) {   // loop over all nodes in the linked list
 					int index = nextNode->index;
-					if ((*args[2] - '0') == index) {
+					if ((*args[2] - '0') == index) {   // if the given index matches with the node index, then remove and shift the subsequent nodes
 						shiftLLNodes(nextNode, prevNode, &bmLLHead);
 						break;
 					}
@@ -389,7 +392,7 @@ int main(void) {
 			// this condition is used to add a new bookmarked command
 			else {
 				struct bookmark *bmLLNode = NULL;
-				if (bmLLHead == NULL) {
+				if (bmLLHead == NULL) {   // this condition is true of bookmark linked list is empty. If so, create a node and add it
 					bmLLNode = (struct bookmark *) malloc(sizeof(struct bookmark));
 					bmLLNode->index = 0;
 					char **bookmarkArgs = malloc(sizeof(char*) * MAX_LINE / 2 + 1);
@@ -397,21 +400,21 @@ int main(void) {
 					bmLLNode->commandLineArgs = bookmarkArgs;
 					bmLLNode->nextBookmark = NULL;
 					bmLLHead = bmLLNode;
-				} else {
+				} else {   // this condition is true if bookmark linked list is not empty
 					bmLLNode = bmLLHead;
-					do {
+					do {   // loop until the end of the linked list
 						if (bmLLNode->nextBookmark == NULL) {
 							break;
 						}
 						bmLLNode = bmLLNode->nextBookmark;
 					} while (bmLLNode != NULL);
-
+					// create a new node, and point the previous node to the newly created one
 					struct bookmark *currentBMNode = (struct bookmark *) malloc(sizeof(struct bookmark));
 					char **bookmarkArgs = malloc(sizeof(char*) * MAX_LINE / 2 + 1);
 					copyBookmarkArgs(bookmarkArgs, args);
 					currentBMNode->commandLineArgs = bookmarkArgs;
 					currentBMNode->nextBookmark = NULL;
-					int currentIndex = bmLLNode->index;
+					int currentIndex = bmLLNode->index;   // get the most recent node's index
 					currentBMNode->index = currentIndex + 1;
 					bmLLNode->nextBookmark = currentBMNode;
                 }
@@ -423,27 +426,27 @@ int main(void) {
 		// <exit>
 		// the following block contains the functionality of exit
 		if (strcmp(args[0], "exit") == 0) {
-			programExecution = 0;
-			backgroundProcessStatus = 1;
+			programExecution = 0;   // set the program execution variable to 0 since this is a built-in functionality
+			backgroundProcessStatus = 1;   // set the status to 1
 
-			struct backgroundProcess *bgLLNode = bgLLHead;
+			struct backgroundProcess *bgLLNode = bgLLHead;   // retrieve the linked list head
 
-			while (bgLLNode != NULL) {
-				if (waitpid(bgLLNode->backgroundProcessId, NULL, WNOHANG) >= 1) {
+			while (bgLLNode != NULL) {   // loop over all nodes in the background processes linked list
+				if (waitpid(bgLLNode->backgroundProcessId, NULL, WNOHANG) >= 1) {   // check out the child status
 					;
 				}
 
 				int status = kill(bgLLNode->backgroundProcessId, 0);
-				if (status == 0) {
+				if (status == 0) {   // check if the background process is the parent's child upon successful kill() call
 					fprintf(stderr, "dear user, you have background processes still running. close them first then exit.\n");
-					backgroundProcessStatus = 0;
+					backgroundProcessStatus = 0;   // update the background process status
 					break;
 				}
 
 				bgLLNode = bgLLNode->nextBackgroundProcess;
 			}
 
-			if (backgroundProcessStatus) {
+			if (backgroundProcessStatus) {   // exit if there are no background processes left
 				exit(0);
 			}
 		}
@@ -453,10 +456,10 @@ int main(void) {
 		// the following block contains the program execution
         if (programExecution) {
             pid_t childpid;
-			int redirectionMode = 0;
-			char inputFile[MAX_LINE/2+1], outputFile[MAX_LINE/2+1];
-			int fd;
-			int fd2;
+			int redirectionMode = 0;   // 1 for >, 2 for >>, 3 for <, 4 for both > and <, 5 for 2>, and 6 for |
+			char inputFile[MAX_LINE/2+1], outputFile[MAX_LINE/2+1];   // buffer to store file names
+			int fd;   // this is used in dup2()
+			int fd2;   // this is used in dup2()
 
             if ((childpid = fork()) == -1 ) {   // this condition is to check if fork was successfull
                 fprintf(stderr, "failed to fork!");
@@ -633,13 +636,13 @@ int main(void) {
 					// <case 6 : pipe (|)>
 					case 6:
 						strcpy(outputFile, "");
-						do {
+						do {   // this loop will copy the args related to pipe
 							strcat(outputFile, args[caseLoopVar]);
 							if (args[caseLoopVar + 1] == NULL)
 								break;
 							strcat(outputFile, " ");
 						} while (args[++caseLoopVar] != NULL);
-						system(outputFile);
+						system(outputFile);   // calling pipe with system()
 						exit(0);
 					// </case 6>
 				}
