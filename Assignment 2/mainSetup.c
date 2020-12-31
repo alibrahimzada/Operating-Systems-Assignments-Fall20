@@ -324,14 +324,14 @@ int main(void) {
 
 					if (history->nextArg != NULL) {
 						history = history->nextArg;   // get the next history node
-						fprintf(stdout, "\rmyshell: %s", history->line);   // print its commands
+						fprintf(stdout, "\rmyshell: %s     ", history->line);   // print its commands
 					}
 
 				} else if (c == 65) { // up arrow (check for A)
 
 					if (node->prevArg != NULL) {
 						node = node->prevArg;   // get the next history node
-						fprintf(stdout, "\rmyshell: %s", node->line);   // prints its commands
+						fprintf(stdout, "\rmyshell: %s     ", node->line);   // prints its commands
 					}
 				}
 			}
