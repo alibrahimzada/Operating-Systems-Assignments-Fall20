@@ -24,7 +24,7 @@ delimiters), and set the args array entries to point to the beginning of what
 will become null-terminated, C-style strings. */
 
 // global variables
-bool isFg = true;
+bool isFg = false;
 int fg;
 
 void setup(char inputBuffer[], char *args[], int *background) {
@@ -171,7 +171,7 @@ void catchCTRLZ(int sigNo) {   // this function is the handler when ctrl-Z is be
 	if (isFg) {   //checks if there are any foreground processes
 		kill(fg, 0);   //checks if foreground process is still running, if it is not then it sets errno to ESRCH
 		if (errno != ESRCH) {
-			kill(fg, SIGKILL);   //because there is a foreground process still running it sends a kill signal
+			kill(fg, SIGSTOP);   //because there is a foreground process still running it sends a stop signal
 			waitpid(-fg, &exit_stat, WNOHANG);   //checks if any zombie children exits 
 			isFg = false;
 		} else {
