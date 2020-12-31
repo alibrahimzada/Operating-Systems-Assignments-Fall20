@@ -763,6 +763,8 @@ int main(void) {
 
 					dir = strtok(NULL, ":");
 				}
+				fprintf(stderr, "your entered command could not be found\n");
+				exit(1);
 
             } else {   // this condition is true when the processor schedules the parent process
                 if (background == 0) {   // this condition is true if the process is foreground
