@@ -375,65 +375,6 @@ int main(void) {
 			continue;
 		}
 
-		// <ps_all>
-        // this if condition will turn off execution mode and perform its task (ps_all)
-        if (strcmp(args[0], "ps_all") == 0) {
-            programExecution = 0;   // set program execution to 0 since this is a built-in functionality
-	    	pid_t childProcessId;
-
-			struct backgroundProcess *bgLLNode = bgLLHead;   // retrieve the linked list head
-			printf("Finished:\n");
-			while (bgLLNode != NULL) {   // loop over all nodes, check their status and find out if they are finished
-				childProcessId = bgLLNode->backgroundProcessId;
-				if (waitpid(childProcessId, NULL, WNOHANG) == childProcessId) {
-					char **arguments = bgLLNode->commandLineArgs;
-					printf("   [%d]  ", bgLLNode->processJobId);   // print the necessary information
-					for (int i = 0; arguments[i] != NULL; i++) {
-						printf("%s ", arguments[i]);
-					}
-					printf("(Pid=%d) \n", bgLLNode->backgroundProcessId);
-					removeLLNode(bgLLNode);   // remove the node from linked list
-				}
-				bgLLNode = bgLLNode->nextBackgroundProcess;
-			}
-
-			printf("\nRunning:\n");
-			bgLLNode = bgLLHead;
-			while (bgLLNode != NULL) {   // loop over all nodes, check their status and find out if they are still running
-				pid_t childProcessId = bgLLNode->backgroundProcessId;
-				if (waitpid(childProcessId, NULL, WNOHANG) == 0) {
-					char **arguments = bgLLNode->commandLineArgs;
-					printf("   [%d]  ", bgLLNode->processJobId);   // print the necessary information
-					for (int i = 0; arguments[i] != NULL; i++) {
-						printf("%s ", arguments[i]);
-					}
-					printf("(Pid=%d) \n", bgLLNode->backgroundProcessId);
-				}
-				bgLLNode = bgLLNode->nextBackgroundProcess;
-			}
-        }
-		// </ps_all>
-
-		// <search>
-		// this if condition will turn off execution mode and perform its task (search)
-		if (strcmp(args[0], "search") == 0) {
-			char keyword[10];   // we assume the search word can be at most 10 chars, although its easily changeable
-			int isRecursive = 0;
-			programExecution = 0;   // set this to 0 since search is a built-in functionality
-
-			if (args[1] == NULL) {   // this condition is to check if a keyword is provided
-				fprintf(stderr, "a keyword should have been provided\n");
-				continue;
-			} else if (strcmp(args[1], "-r") == 0) {   // this condition is to check if we do a recursive search
-				isRecursive = 1;   // set the flag to 1 in case of a recursive search
-				strncpy(keyword, args[2] + 1, strlen(args[2]) - 2);   // clean the keyword from ""s
-			} else {   // this condition is to check if we do a non recursive search
-				strncpy(keyword, args[1] + 1, strlen(args[1]) - 2);   // clean the keyword from ""s
-			}
-			search(".", isRecursive, keyword);   // call the search function
-		}
-		// </search>
-
 		// <bookmark>
 		// this if condition will turn off execution mode and perform its task (bookmark)
 		if (strcmp(args[0], "bookmark") == 0) {
@@ -515,6 +456,65 @@ int main(void) {
 			}
 		}
 		// </bookmark>
+
+		// <ps_all>
+        // this if condition will turn off execution mode and perform its task (ps_all)
+        if (strcmp(args[0], "ps_all") == 0) {
+            programExecution = 0;   // set program execution to 0 since this is a built-in functionality
+	    	pid_t childProcessId;
+
+			struct backgroundProcess *bgLLNode = bgLLHead;   // retrieve the linked list head
+			printf("Finished:\n");
+			while (bgLLNode != NULL) {   // loop over all nodes, check their status and find out if they are finished
+				childProcessId = bgLLNode->backgroundProcessId;
+				if (waitpid(childProcessId, NULL, WNOHANG) == childProcessId) {
+					char **arguments = bgLLNode->commandLineArgs;
+					printf("   [%d]  ", bgLLNode->processJobId);   // print the necessary information
+					for (int i = 0; arguments[i] != NULL; i++) {
+						printf("%s ", arguments[i]);
+					}
+					printf("(Pid=%d) \n", bgLLNode->backgroundProcessId);
+					removeLLNode(bgLLNode);   // remove the node from linked list
+				}
+				bgLLNode = bgLLNode->nextBackgroundProcess;
+			}
+
+			printf("\nRunning:\n");
+			bgLLNode = bgLLHead;
+			while (bgLLNode != NULL) {   // loop over all nodes, check their status and find out if they are still running
+				pid_t childProcessId = bgLLNode->backgroundProcessId;
+				if (waitpid(childProcessId, NULL, WNOHANG) == 0) {
+					char **arguments = bgLLNode->commandLineArgs;
+					printf("   [%d]  ", bgLLNode->processJobId);   // print the necessary information
+					for (int i = 0; arguments[i] != NULL; i++) {
+						printf("%s ", arguments[i]);
+					}
+					printf("(Pid=%d) \n", bgLLNode->backgroundProcessId);
+				}
+				bgLLNode = bgLLNode->nextBackgroundProcess;
+			}
+        }
+		// </ps_all>
+
+		// <search>
+		// this if condition will turn off execution mode and perform its task (search)
+		if (strcmp(args[0], "search") == 0) {
+			char keyword[10];   // we assume the search word can be at most 10 chars, although its easily changeable
+			int isRecursive = 0;
+			programExecution = 0;   // set this to 0 since search is a built-in functionality
+
+			if (args[1] == NULL) {   // this condition is to check if a keyword is provided
+				fprintf(stderr, "a keyword should have been provided\n");
+				continue;
+			} else if (strcmp(args[1], "-r") == 0) {   // this condition is to check if we do a recursive search
+				isRecursive = 1;   // set the flag to 1 in case of a recursive search
+				strncpy(keyword, args[2] + 1, strlen(args[2]) - 2);   // clean the keyword from ""s
+			} else {   // this condition is to check if we do a non recursive search
+				strncpy(keyword, args[1] + 1, strlen(args[1]) - 2);   // clean the keyword from ""s
+			}
+			search(".", isRecursive, keyword);   // call the search function
+		}
+		// </search>
 
 		// <exit>
 		// the following block contains the functionality of exit
