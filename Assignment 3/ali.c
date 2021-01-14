@@ -4,11 +4,6 @@
 # include <pthread.h>
 # include <semaphore.h>
 
-typedef struct {   // this structure is used to pass multiple data to a publisher thread
-	int publisher_type;
-	int publisher_id;
-} publisher_args;
-
 // threads
 pthread_t *publisher_thread;
 pthread_t *packager_thread;
@@ -30,8 +25,21 @@ void red_info() { printf("\033[0;31m [INFO] \033[0;37m"); }
 void green_info() { printf("\033[0;32m [INFO] \033[0;37m"); }
 void yellow_info() { printf("\033[0;33m [INFO] \033[0;37m"); }
 
+void *doubleTheSize(char **current_publisher_buffer) {
+	current_publisher_buffer = (char **) realloc(current_publisher_buffer, sizeof(current_publisher_buffer)*2);
+}
+
+int sizeOfBuffer(char **buffer){
+	int i;
+	for (i=0; (buffer+i) != NULL; i++);
+	return i;
+}
+
 void *publish(void *thread_args) {
-	publisher_args *args = (publisher_args *) thread_args;   // retrieving the arguments
+	int *temp = (int *) thread_args;   // retrieving the argument
+
+	int publisher_type = *temp / n_publisher_thread + 1;   // setting publisher type
+	int publisher_id = (*temp % n_publisher_thread) + 1;   // setting publisher id of a specific type
 	int books_published_by_thread = 0;
 
 	// TODO: the first thread scheduled of this type will allocate memory to buffer
@@ -48,6 +56,7 @@ void *publish(void *thread_args) {
 
 void *pack(void *thread_args) {
 	int *packager_id = (int *) thread_args;
+	(*packager_id)++;
 
 	// TODO: the first thread scheduled of this type will allocate memory to buffer
 	// TODO: we should handle synchronization
@@ -56,6 +65,7 @@ void *pack(void *thread_args) {
 }
 
 int main(int argc, char *argv[]) {
+	int i;
 	srand(time(NULL));   // initialization, should only be called once.
 
 	if (argc != 10) {   // checking if there are insufficient number of arguments
@@ -64,7 +74,7 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	for (int i = 0; i < argc; i++) {   // this loop parses the given arguments
+	for (i = 0; i < argc; i++) {   // this loop parses the given arguments
 		if (strcmp(argv[i], "-n") == 0) {
 			n_publisher_type = atoi(argv[++i]);   // storing total number of publisher types
 			n_publisher_thread = atoi(argv[++i]);   // storing total number of publisher thread per type
@@ -78,7 +88,6 @@ int main(int argc, char *argv[]) {
 	}
 
 	int total_publishers = n_publisher_type * n_publisher_thread;   // calculating total number of publisher threads
-	publisher_args publisher_args_array[total_publishers];
 	publisher_thread = malloc(total_publishers * sizeof(pthread_t));   // dynamic memory allocation for threads
 	packager_thread = malloc(n_packager_thread * sizeof(pthread_t));   // dynamic memory allocation for threads
 	total_published_book = calloc(n_publisher_type, sizeof(int));   // dynamic memory allocation for total published book for each thread type, and setting them to 0
@@ -87,29 +96,26 @@ int main(int argc, char *argv[]) {
 	full_semaphores = malloc(n_publisher_type * sizeof(sem_t));
 	publisher_mutex = malloc(n_publisher_type * sizeof(pthread_mutex_t));
 
-	for (int i = 0; i < n_publisher_type; i++) {
+	for (i = 0; i < n_publisher_type; i++) {
 		sem_init((empty_semaphores + i), 0, buffer_size);
 		sem_init((full_semaphores + i), 0, 0);
 		pthread_mutex_init((publisher_mutex + i), NULL);
 	}
 	pthread_mutex_init(&packager_mutex, NULL);
 
-	for (int i = 0; i < total_publishers; i++) {   // this loop creates each publisher thread and ask them to publish
-		publisher_args_array[i].publisher_type = i / n_publisher_thread + 1;   // setting publisher type
-		publisher_args_array[i].publisher_id = (i % n_publisher_thread) + 1;   // setting publisher id of a specific type
-		pthread_create(&publisher_thread[i], NULL, publish, (void *) &publisher_args_array[i]);
+	for (i = 0; i < total_publishers; i++) {   // this loop creates each publisher thread and ask them to publish
+		pthread_create(&publisher_thread[i], NULL, publish, (void *) &i);
 	}
 
-	for (int i = 0; i < n_packager_thread; i++) {   // this loop creates each packager thread and ask them to pack
-		int packager_id = i + 1;
-		pthread_create(&packager_thread[i], NULL, pack, (void *) &packager_id);
+	for (i = 0; i < n_packager_thread; i++) {   // this loop creates each packager thread and ask them to pack
+		pthread_create(&packager_thread[i], NULL, pack, (void *) &i);
 	}
 
-	for (int i = 0; i < total_publishers; i++) {   // this loop forces the main thread to wait for each publisher thread to finish
+	for (i = 0; i < total_publishers; i++) {   // this loop forces the main thread to wait for each publisher thread to finish
 		pthread_join(publisher_thread[i], NULL);
 	}
 
-	for (int i = 0; i < n_packager_thread; i++) {   // this loop forces the main thread to wait for each packager thread to finish
+	for (i = 0; i < n_packager_thread; i++) {   // this loop forces the main thread to wait for each packager thread to finish
 		pthread_join(packager_thread[i], NULL);
 	}
 
@@ -117,9 +123,9 @@ int main(int argc, char *argv[]) {
 	free(packager_thread);   // deallocating the allocated memory for packager threads from heap
 	free(total_published_book);   // deallocating the allocated memory for total published book from heap
 
-	for (int i = 0; i < n_publisher_type; i++) {   // this loop destroys the created semaphores and mutexes because the program will end
+	for (i = 0; i < n_publisher_type; i++) {   // this loop destroys the created semaphores and mutexes because the program will end
 		sem_destroy(empty_semaphores + i);
-		sem_destroy(empty_semaphores + i);
+		sem_destroy(full_semaphores + i);
 		pthread_mutex_destroy(publisher_mutex + i);
 	}
 	pthread_mutex_destroy(&packager_mutex);
