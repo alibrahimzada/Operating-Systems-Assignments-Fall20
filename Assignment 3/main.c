@@ -212,10 +212,16 @@ int main(int argc, char *argv[]) {
 	}
 
 	int total_publishers = n_publisher_type * n_publisher_thread;   // calculating total number of publisher threads
+	
 	publisher_thread = malloc(total_publishers * sizeof(pthread_t));   // dynamic memory allocation for threads
 	packager_thread = malloc(n_packager_thread * sizeof(pthread_t));   // dynamic memory allocation for threads
 	total_published_book = calloc(n_publisher_type, sizeof(int));   // dynamic memory allocation for total published book for each thread type, and setting them to 0
 	total_thread_left = calloc(n_publisher_type, sizeof(int));   // dynamic memory allocation for total thread left in the program
+
+	if ((publisher_thread == NULL) || (packager_thread == NULL) || (total_published_book == NULL) || (total_thread_left == NULL)) {
+		fprintf(stderr, "could not allocate memory. exiting the program\n");
+		return 1;
+	}
 
 	for (i = 0; i < n_publisher_type; i++) {   // assigning initial values to total thread left of each type
 		total_thread_left[i] = n_publisher_thread;
@@ -227,6 +233,11 @@ int main(int argc, char *argv[]) {
 	empty_semaphores = malloc(n_publisher_type * sizeof(sem_t));
 	full_semaphores = malloc(n_publisher_type * sizeof(sem_t));
 	publisher_mutex = malloc(n_publisher_type * sizeof(pthread_mutex_t));
+
+	if ((publisher_buffers == NULL) || (empty_semaphores == NULL) || (full_semaphores == NULL) || (publisher_mutex == NULL)) {
+		fprintf(stderr, "could not allocate memory. exiting the program\n");
+		return 1;
+	}
 
 	for (i = 0; i < n_publisher_type; i++) {   // this loop initializes the semaphores and mutexes
 		sem_init((empty_semaphores + i), 0, buffer_size);
